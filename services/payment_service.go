@@ -15,27 +15,26 @@
 package services
 
 import (
-    paymentapi "app/api/paymentapi"
-    "net/http"
+	paymentapi "app/api/paymentapi/stdlib"
+	"net/http"
 )
 
 // PaymentAPIService encapsulates registration for the Payment API.
 type PaymentAPIService struct {
-    handler paymentapi.ServerInterface
+	handler paymentapi.ServerInterface
 }
 
 func NewPaymentAPIService(h paymentapi.ServerInterface) *PaymentAPIService {
-    return &PaymentAPIService{handler: h}
+	return &PaymentAPIService{handler: h}
 }
 
 func (s *PaymentAPIService) Register(mux *http.ServeMux) {
-    if s.handler == nil {
-        return
-    }
-    paymentapi.HandlerFromMux(s.handler, mux)
+	if s.handler == nil {
+		return
+	}
+	paymentapi.HandlerFromMux(s.handler, mux)
 }
 
 func (s *PaymentAPIService) Middlewares() []func(http.Handler) http.Handler {
-    return nil
+	return nil
 }
-

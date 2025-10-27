@@ -15,45 +15,44 @@
 package services
 
 import (
-    profileapi "app/api/profileapi"
-    profile_service "app/profile-service"
-    "net/http"
+	profileapi "app/api/profileapi/stdlib"
+	profile_service "app/profile-service"
+	"net/http"
 )
 
 // ProfileAPIService encapsulates the registration logic for the Profile API.
 type ProfileAPIService struct {
-    handler profileapi.StrictServerInterface
+	handler profileapi.StrictServerInterface
 }
 
 func NewProfileAPIService(h profileapi.StrictServerInterface) *ProfileAPIService {
-    return &ProfileAPIService{handler: h}
+	return &ProfileAPIService{handler: h}
 }
 
 // Register configures the strict handler and mounts the profile API routes.
 func (s *ProfileAPIService) Register(mux *http.ServeMux) {
-    strict := profileapi.NewStrictHandlerWithOptions(
-        s.handler,
-        []profileapi.StrictMiddlewareFunc{},
-        profileapi.StrictHTTPServerOptions{
-            RequestErrorHandlerFunc:  profile_service.ProblemDetailsRequestErrorHandler,
-            ResponseErrorHandlerFunc: profile_service.ProblemDetailsResponseErrorHandler,
-        },
-    )
+	strict := profileapi.NewStrictHandlerWithOptions(
+		s.handler,
+		[]profileapi.StrictMiddlewareFunc{},
+		profileapi.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  profile_service.ProblemDetailsRequestErrorHandler,
+			ResponseErrorHandlerFunc: profile_service.ProblemDetailsResponseErrorHandler,
+		},
+	)
 
-    profileapi.HandlerWithOptions(
-        strict,
-        profileapi.StdHTTPServerOptions{
-            BaseRouter:       mux,
-            Middlewares:      []profileapi.MiddlewareFunc{},
-            ErrorHandlerFunc: profile_service.ProblemDetailsRequestErrorHandler,
-        },
-    )
+	profileapi.HandlerWithOptions(
+		strict,
+		profileapi.StdHTTPServerOptions{
+			BaseRouter:       mux,
+			Middlewares:      []profileapi.MiddlewareFunc{},
+			ErrorHandlerFunc: profile_service.ProblemDetailsRequestErrorHandler,
+		},
+	)
 }
 
 // Middlewares returns global middlewares required by the Profile API, such as validation.
 func (s *ProfileAPIService) Middlewares() []func(http.Handler) http.Handler {
-    return []func(http.Handler) http.Handler{
-        profile_service.ProfileHTTPValidationMiddleware(),
-    }
+	return []func(http.Handler) http.Handler{
+		profile_service.ProfileHTTPValidationMiddleware(),
+	}
 }
-

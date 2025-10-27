@@ -37,7 +37,3 @@ func Test_100_Workload(t *testing.T) {
 
 	BlockingPool(context.Background(), 5, jobs, worker)
 }
-
-func Test_10K_Workload(t *testing.T) {
-
-}
