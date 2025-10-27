@@ -1,0 +1,380 @@
+# Copyright 2025 Nguyen Nhat Nguyen
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+openapi: 3.0.3
+info:
+  title: Profile Service API
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+  - url: http://localhost:8080
+tags:
+  - name: profile
+    description: Profile resources
+  - name: health
+    description: Operational endpoints
+
+paths:
+  /v1/profiles:
+    get:
+      tags: [profile]
+      summary: List profiles (offset or cursor pagination)
+      operationId: listProfiles
+      description: >
+        Supply **either** `page`+`pageSize` (offset) **or** `before/after`+`limit` (cursor).
+        If both sets are present or incomplete, the server returns 400 with a Problem.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CursorAfter"
+        - $ref: "#/components/parameters/CursorBefore"
+        - $ref: "#/components/parameters/Limit"
+
+      responses:
+        "200":
+          description: A page of profiles
+          headers:
+            Link:
+              description: RFC 8288 Web Linking (e.g., rel="next", rel="prev")
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessProfileList"
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "401": { $ref: "#/components/responses/ProblemResponse" }
+        "429": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+    post:
+      tags: [profile]
+      summary: Create a profile
+      operationId: createProfile
+      requestBody:
+        $ref: "#/components/requestBodies/CreateProfile"
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              description: URI of the created profile
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessProfile"
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "422": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+  /v1/profiles/{id}:
+    get:
+      tags: [profile]
+      summary: Get profile by ID
+      operationId: getProfileById
+      parameters:
+        - $ref: "#/components/parameters/ProfileId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessProfile"
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "404": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+    put:
+      tags: [profile]
+      summary: Update an existing profile
+      operationId: updateProfile
+      parameters:
+        - $ref: "#/components/parameters/ProfileId"
+      requestBody:
+        $ref: "#/components/requestBodies/CreateProfile"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessProfile"
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "404": { $ref: "#/components/responses/ProblemResponse" }
+        "422": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+    patch:
+      tags: [profile]
+      summary: Patch an existing profile
+      operationId: modifyProfile
+      parameters:
+        - $ref: "#/components/parameters/ProfileId"
+      requestBody:
+        $ref: "#/components/requestBodies/CreateProfile"
+      responses:
+        "200":
+          description: Modified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessProfile"
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "404": { $ref: "#/components/responses/ProblemResponse" }
+        "422": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+    delete:
+      tags: [profile]
+      summary: Delete a profile
+      operationId: deleteProfile
+      parameters:
+        - $ref: "#/components/parameters/ProfileId"
+      responses:
+        "204":
+          description: Deleted (no content)
+        "400": { $ref: "#/components/responses/ProblemResponse" }
+        "404": { $ref: "#/components/responses/ProblemResponse" }
+        default:
+          $ref: "#/components/responses/ProblemResponse"
+
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      operationId: healthz
+      responses:
+        "204":
+          description: No content
+
+components:
+  ############################
+  # Parameters
+  ############################
+  parameters:
+    ProfileId:
+      name: id
+      in: path
+      required: true
+      description: Profile identifier
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      description: 0-based page number (use with `pageSize`)
+      schema: { type: integer, minimum: 0 , maximum: 1000 }
+    PageSize:
+      name: pageSize
+      in: query
+      description: Page size (use with `page`)
+      schema: { type: integer, minimum: 1, maximum: 200 }
+    CursorAfter:
+      name: after
+      in: query
+      description: Opaque cursor returned by the previous response (use with `limit`)
+      schema: { type: string, minLength: 1, maxLength: 1000 }
+    CursorBefore:
+      name: before
+      in: query
+      description: Opaque cursor returned by the previous response (use with `limit`)
+      schema: { type: string, minLength: 1, maxLength: 1000 }
+    Limit:
+      name: limit
+      in: query
+      description: Page size for cursor pagination (use with `cursor`)
+      schema: { type: integer, minimum: 1, maximum: 200 }
+
+  ############################
+  # Schemas
+  ############################
+  schemas:
+    # --- Domain ---
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "11111111-1111-1111-1111-111111111111"
+        name:
+          type: string
+          example: "Jane Doe"
+        age:
+          type: string
+          maxLength: 3
+          minLength: 1
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: "jane@example.com"
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Generic envelopes (generic "data" to be specialized) ---
+    SuccessEnvelopeSingle:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {} # placeholder
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            traceId: { type: string }
+            requestId: { type: string }
+
+    SuccessEnvelopeList:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {} # placeholder
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # --- Domain-specific aliases (specialize generic "data") ---
+    SuccessProfile:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelopeSingle"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Profile"
+
+    SuccessProfileList:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelopeList"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Profile"
+
+    # --- RFC 7807 Problem (+extensions) ---
+    Problem:
+      type: object
+      required: [title, status]
+      additionalProperties: true
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer, minimum: 100, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        code: { type: string }
+        traceId: { type: string }
+        invalidParams:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, reason]
+            properties:
+              name: { type: string }
+              reason: { type: string }
+
+    # --- Pagination (discriminated union) ---
+    PaginationMeta:
+      oneOf:
+        - $ref: "#/components/schemas/OffsetMeta"
+        - $ref: "#/components/schemas/CursorMeta"
+      discriminator:
+        propertyName: mode
+        mapping:
+          offset: "#/components/schemas/OffsetMeta"
+          cursor: "#/components/schemas/CursorMeta"
+
+    OffsetMeta:
+      type: object
+      additionalProperties: false
+      required: [mode, page, pageSize, totalItems, totalPages]
+      properties:
+        mode:
+          type: string
+          enum: [offset]
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        totalItems: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        traceId: { type: string }
+        requestId: { type: string }
+        links:
+          type: object
+          additionalProperties: false
+          properties:
+            next: { type: string, format: uri }
+            prev: { type: string, format: uri }
+
+    CursorMeta:
+      type: object
+      additionalProperties: false
+      required: [mode, limit]
+      properties:
+        mode:
+          type: string
+          enum: [cursor]
+        limit: { type: integer, minimum: 1 }
+        nextCursor: { type: string }
+        prevCursor: { type: string }
+        traceId: { type: string }
+        requestId: { type: string }
+        links:
+          type: object
+          additionalProperties: false
+          properties:
+            next: { type: string, format: uri }
+            prev: { type: string, format: uri }
+
+  ############################
+  # Responses & RequestBodies
+  ############################
+  responses:
+    ProblemResponse:
+      description: RFC 7807 Problem Details
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  requestBodies:
+    CreateProfile:
+      description: Profile payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                type: string
+                example: "Jane Doe"
+                minLength: 5
+                maxLength: 50
+              email: { type: string, format: email }
