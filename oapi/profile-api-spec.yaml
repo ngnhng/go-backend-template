@@ -127,7 +127,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ProfileId"
       requestBody:
-        $ref: "#/components/requestBodies/CreateProfile"
+        $ref: "#/components/requestBodies/ModifyProfile"
       responses:
         "200":
           description: Modified
@@ -377,4 +377,25 @@ components:
                 example: "Jane Doe"
                 minLength: 5
                 maxLength: 50
+              email: { type: string, format: email }
+    ModifyProfile:
+      description: Partial profile update payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+                nullable: true
+                example: "Jane Doe"
+                minLength: 5
+                maxLength: 50
+              age:
+                type: string
+                minLength: 1
+                maxLength: 3
+                nullable: true
               email: { type: string, format: email }

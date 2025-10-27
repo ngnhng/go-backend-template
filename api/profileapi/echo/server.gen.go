@@ -150,6 +150,13 @@ type CreateProfile struct {
 	Name  string               `json:"name"`
 }
 
+// ModifyProfile defines model for ModifyProfile.
+type ModifyProfile struct {
+	Age   nullable.Nullable[string] `json:"age,omitempty"`
+	Email *openapi_types.Email      `json:"email,omitempty"`
+	Name  nullable.Nullable[string] `json:"name,omitempty"`
+}
+
 // ListProfilesParams defines parameters for ListProfiles.
 type ListProfilesParams struct {
 	// Page 0-based page number (use with `pageSize`)
@@ -176,8 +183,9 @@ type CreateProfileJSONBody struct {
 
 // ModifyProfileJSONBody defines parameters for ModifyProfile.
 type ModifyProfileJSONBody struct {
-	Email *openapi_types.Email `json:"email,omitempty"`
-	Name  string               `json:"name"`
+	Age   nullable.Nullable[string] `json:"age,omitempty"`
+	Email *openapi_types.Email      `json:"email,omitempty"`
+	Name  nullable.Nullable[string] `json:"name,omitempty"`
 }
 
 // UpdateProfileJSONBody defines parameters for UpdateProfile.

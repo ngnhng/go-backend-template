@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime/types"
 )
@@ -65,17 +66,55 @@ func (p *ProfileAPI) CreateProfile(ctx context.Context, request api.CreateProfil
 
 // DeleteProfile implements profile_api.StrictServerInterface.
 func (p *ProfileAPI) DeleteProfile(ctx context.Context, request api.DeleteProfileRequestObject) (api.DeleteProfileResponseObject, error) {
-	panic("unimplemented")
+	uid, err := uuid.FromBytes(request.Id[:])
+	if err != nil {
+		prob := BadRequestProblem("invalid id")
+		WithInvalidParam("id", "invalid value")(prob)
+		return api.DeleteProfile400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+	}
+	if err := p.app.DeleteProfile(ctx, uid); err != nil {
+		prob := ProblemFromDomainError(err)
+		switch {
+		case errors.Is(err, ErrInvalidData):
+			WithInvalidParam("id", "invalid value")(prob)
+			return api.DeleteProfile400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+		case errors.Is(err, ErrProfileNotFound):
+			return api.DeleteProfile404ApplicationProblemPlusJSONResponse(*prob), nil
+		default:
+			return api.DeleteProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
+		}
+	}
+	return api.DeleteProfile204Response{}, nil
 }
 
 // GetProfileById implements profile_api.StrictServerInterface.
 func (p *ProfileAPI) GetProfileById(ctx context.Context, request api.GetProfileByIdRequestObject) (api.GetProfileByIdResponseObject, error) {
-	panic("unimplemented")
+	uid, err := uuid.FromBytes(request.Id[:])
+	if err != nil {
+		prob := BadRequestProblem("invalid id")
+		WithInvalidParam("id", "invalid value")(prob)
+		return api.GetProfileById400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+	}
+	prof, err := p.app.GetProfileByID(ctx, uid)
+	if err != nil {
+		prob := ProblemFromDomainError(err)
+		switch {
+		case errors.Is(err, ErrInvalidData):
+			WithInvalidParam("id", "invalid value")(prob)
+			return api.GetProfileById400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+		case errors.Is(err, ErrProfileNotFound):
+			return api.GetProfileById404ApplicationProblemPlusJSONResponse(*prob), nil
+		default:
+			return api.GetProfileByIddefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
+		}
+	}
+	resp := api.SuccessProfile{Data: mapProfile([]Profile{*prof})[0]}
+	return api.GetProfileById200JSONResponse(resp), nil
 }
 
 // Healthz implements profile_api.StrictServerInterface.
 func (p *ProfileAPI) Healthz(ctx context.Context, request api.HealthzRequestObject) (api.HealthzResponseObject, error) {
-	panic("unimplemented")
+	return api.Healthz204Response{}, nil
 }
 
 // ListProfiles implements profile_api.StrictServerInterface.
@@ -231,12 +270,112 @@ func (p *ProfileAPI) ListProfiles(ctx context.Context, request api.ListProfilesR
 
 // ModifyProfile implements profile_api.StrictServerInterface.
 func (p *ProfileAPI) ModifyProfile(ctx context.Context, request api.ModifyProfileRequestObject) (api.ModifyProfileResponseObject, error) {
-	panic("unimplemented")
+	uid, err := uuid.FromBytes(request.Id[:])
+	if err != nil {
+		prob := BadRequestProblem("invalid id")
+		WithInvalidParam("id", "invalid value")(prob)
+		return api.ModifyProfile400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+	}
+	// Compute tri-state updates
+	nameSet, nameNull, nameVal := false, false, ""
+	ageSet, ageNull := false, false
+	var ageValInt32 int32
+	emailSet, emailVal := false, ""
+
+	if request.Body != nil {
+		// name: nullable string
+		if request.Body.Name.IsSpecified() {
+			nameSet = true
+			if request.Body.Name.IsNull() {
+				nameNull = true
+			} else {
+				v := request.Body.Name.MustGet()
+				nameVal = v
+			}
+		}
+		// age: nullable string containing integer (1..150)
+		if request.Body.Age.IsSpecified() {
+			ageSet = true
+			if request.Body.Age.IsNull() {
+				ageNull = true
+			} else {
+				v := request.Body.Age.MustGet()
+				if v == "" {
+					prob := ValidationProblem("validation failed")
+					WithInvalidParam("age", "invalid value")(prob)
+					return api.ModifyProfile422ApplicationProblemPlusJSONResponse(*prob), nil
+				}
+				n, perr := strconv.Atoi(v)
+				if perr != nil || n < 1 || n > 150 {
+					prob := ValidationProblem("validation failed")
+					WithInvalidParam("age", "invalid value")(prob)
+					return api.ModifyProfile422ApplicationProblemPlusJSONResponse(*prob), nil
+				}
+				ageValInt32 = int32(n)
+			}
+		}
+		// email: regular optional update, null not accepted
+		if request.Body.Email != nil {
+			emailSet = true
+			emailVal = string(*request.Body.Email)
+		}
+	}
+
+	if !nameSet && !ageSet && !emailSet {
+		prob := ValidationProblem("validation failed")
+		WithInvalidParam("body", "no valid fields to update")(prob)
+		return api.ModifyProfile422ApplicationProblemPlusJSONResponse(*prob), nil
+	}
+
+	updated, err := p.app.ModifyProfile(ctx, uid, nameSet, nameNull, nameVal, ageSet, ageNull, ageValInt32, emailSet, emailVal)
+	if err != nil {
+		prob := ProblemFromDomainError(err)
+		switch {
+		case errors.Is(err, ErrInvalidData):
+			WithInvalidParam("body", "no valid fields to update")(prob)
+			return api.ModifyProfile422ApplicationProblemPlusJSONResponse(*prob), nil
+		case errors.Is(err, ErrDuplicateProfile):
+			return api.ModifyProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 409}, nil
+		case errors.Is(err, ErrProfileNotFound):
+			return api.ModifyProfile404ApplicationProblemPlusJSONResponse(*prob), nil
+		default:
+			return api.ModifyProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
+		}
+	}
+	resp := api.SuccessProfile{Data: mapProfile([]Profile{*updated})[0]}
+	return api.ModifyProfile200JSONResponse(resp), nil
 }
 
 // UpdateProfile implements profile_api.StrictServerInterface.
 func (p *ProfileAPI) UpdateProfile(ctx context.Context, request api.UpdateProfileRequestObject) (api.UpdateProfileResponseObject, error) {
-	panic("unimplemented")
+	uid, err := uuid.FromBytes(request.Id[:])
+	if err != nil {
+		prob := BadRequestProblem("invalid id")
+		WithInvalidParam("id", "invalid value")(prob)
+		return api.UpdateProfile400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
+	}
+	var emailPtr *string
+	if request.Body != nil && request.Body.Email != nil {
+		s := string(*request.Body.Email)
+		emailPtr = &s
+	}
+	updated, err := p.app.UpdateProfile(ctx, uid, request.Body.Name, emailPtr)
+	if err != nil {
+		prob := ProblemFromDomainError(err)
+		switch {
+		case errors.Is(err, ErrInvalidData):
+			WithInvalidParam("name", "invalid value")(prob)
+			return api.UpdateProfile422ApplicationProblemPlusJSONResponse(*prob), nil
+		case errors.Is(err, ErrDuplicateProfile):
+			return api.UpdateProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 409}, nil
+		case errors.Is(err, ErrProfileNotFound):
+			return api.UpdateProfile404ApplicationProblemPlusJSONResponse(*prob), nil
+		default:
+			return api.UpdateProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
+		}
+	}
+	resp := api.SuccessProfile{Data: mapProfile([]Profile{*updated})[0]}
+	return api.UpdateProfile200JSONResponse(resp), nil
 }
 
 func NewProfileService(pool db.ConnectionPool, persistence ProfilePersistence, signer CursorSigner) *ProfileAPI {

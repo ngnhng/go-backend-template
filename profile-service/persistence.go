@@ -20,15 +20,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
-
-// On pgx error handling:
-// https://github.com/jackc/pgx/wiki/Error-Handling
 
 // On pgx error handling:
 // https://github.com/jackc/pgx/wiki/Error-Handling
@@ -140,4 +138,118 @@ func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Que
 
 	slog.DebugContext(ctx, "persisted profile", slog.Any("profile", fmt.Sprintf("%+v", createdProfile)))
 	return &createdProfile, nil
+}
+
+// GetProfileByID fetches a single non-deleted profile.
+func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Querier, id uuid.UUID) (*Profile, error) {
+	query := fmt.Sprintf(`
+        SELECT id, username, email, age, created_at
+        FROM %s
+        WHERE id = $1 AND deleted_at IS NULL
+    `, p.TableName)
+	var prof Profile
+	if err := sqlx.GetContext(ctx, q, &prof, query, id); err != nil {
+		return nil, err
+	}
+	return &prof, nil
+}
+
+// UpdateProfile updates username and optionally email, returning the updated entity.
+func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Querier, id uuid.UUID, name string, email *string) (*Profile, error) {
+	if len(name) == 0 {
+		return nil, ErrInvalidData
+	}
+	var (
+		query string
+		args  []any
+	)
+	if email != nil {
+		query = fmt.Sprintf(`
+            UPDATE %s
+            SET username = $2, email = $3
+            WHERE id = $1 AND deleted_at IS NULL
+            RETURNING id, username, email, age, created_at
+        `, p.TableName)
+		args = []any{id, name, *email}
+	} else {
+		query = fmt.Sprintf(`
+            UPDATE %s
+            SET username = $2
+            WHERE id = $1 AND deleted_at IS NULL
+            RETURNING id, username, email, age, created_at
+        `, p.TableName)
+		args = []any{id, name}
+	}
+	var prof Profile
+	if err := sqlx.GetContext(ctx, q, &prof, query, args...); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrDuplicateEntry
+		}
+		return nil, err
+	}
+	return &prof, nil
+}
+
+// DeleteProfile performs a soft delete; returns sql.ErrNoRows if not found.
+func (p *PostgresProfilePersistence) DeleteProfile(ctx context.Context, q db.Querier, id uuid.UUID) error {
+	query := fmt.Sprintf(`
+        UPDATE %s SET deleted_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id
+    `, p.TableName)
+	var ret uuid.UUID
+	if err := sqlx.GetContext(ctx, q, &ret, query, id); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ModifyProfile performs partial updates based on provided fields.
+func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Querier, id uuid.UUID, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*Profile, error) {
+	if !nameSet && !ageSet && !emailSet {
+		return nil, ErrInvalidData
+	}
+	sets := []string{}
+	args := []any{id}
+	idx := 2
+	if nameSet {
+		if nameNull {
+			sets = append(sets, "username = NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("username = $%d", idx))
+			args = append(args, nameVal)
+			idx++
+		}
+	}
+	if ageSet {
+		if ageNull {
+			sets = append(sets, "age = NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("age = $%d", idx))
+			args = append(args, ageVal)
+			idx++
+		}
+	}
+	if emailSet {
+		sets = append(sets, fmt.Sprintf("email = $%d", idx))
+		args = append(args, emailVal)
+		idx++
+	}
+	query := fmt.Sprintf(`
+        UPDATE %s
+        SET %s
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, username, email, age, created_at
+    `, p.TableName, strings.Join(sets, ", "))
+
+	var prof Profile
+	if err := sqlx.GetContext(ctx, q, &prof, query, args...); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrDuplicateEntry
+		}
+		return nil, err
+	}
+	return &prof, nil
 }
