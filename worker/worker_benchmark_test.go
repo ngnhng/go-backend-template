@@ -47,6 +47,33 @@ func Benchmark_BlockingPool_SHA256(b *testing.B) {
 	}
 }
 
+func Benchmark_BlockingPool_AllocateAndHash(b *testing.B) {
+	sizes := []int{1, 2, 4, 8, 16, 32}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("pool_size=%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			ctx := context.Background()
+			jobs := make(chan int, 1024)
+
+			w := func(_ context.Context, _ int) {
+				buf := make([]byte, 4096) // force alloc
+				_, _ = rand.Read(buf)     // “IO-ish”
+				_ = sha256.Sum256(buf)    // some CPU
+			}
+
+			b.ResetTimer()
+			go func(n int) {
+				for i := range n {
+					jobs <- i
+				}
+				close(jobs)
+			}(b.N)
+
+			BlockingPool(ctx, size, jobs, w)
+		})
+	}
+}
+
 func Benchmark_Direct_SHA256(b *testing.B) {
 	payload := make([]byte, 1024)
 	_, _ = rand.Read(payload)
