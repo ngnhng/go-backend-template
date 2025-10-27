@@ -15,9 +15,6 @@
 package server
 
 import (
-	payment_api "app/api/paymentapi"
-	profile_api "app/api/profileapi"
-	profile_service "app/profile-service"
 	"log/slog"
 
 	"context"
@@ -32,12 +29,16 @@ const MAX_TCP_PORT = 1 << 16 // A TCP header uses a 16-bit field for port number
 
 type (
 	Server struct {
-		profileApi profile_api.StrictServerInterface
-		paymentApi payment_api.ServerInterface
-
 		server *http.Server
+		mux    *http.ServeMux
 		host   string
 		port   uint16
+
+		// global middleware chain applied around the mux
+		middlewares []func(http.Handler) http.Handler
+
+		// registrable services that mount routes and provide their own middlewares
+		services []RegistrableService
 	}
 
 	ServerOptions func(*Server)
@@ -63,15 +64,23 @@ func WithReadTimeout(t time.Duration) ServerOptions {
 	}
 }
 
-func WithPaymentApi(si payment_api.ServerInterface) ServerOptions {
+// WithServices registers a collection of self-contained, registrable services.
+func WithServices(svcs ...RegistrableService) ServerOptions {
 	return func(s *Server) {
-		s.paymentApi = si
+		if len(svcs) > 0 {
+			s.services = append(s.services, svcs...)
+		}
 	}
 }
 
-func WithProfileApi(si profile_api.StrictServerInterface) ServerOptions {
+// WithGlobalMiddlewares registers global middlewares wrapping the entire server mux.
+// The middlewares are applied in the order provided.
+func WithGlobalMiddlewares(mw ...func(http.Handler) http.Handler) ServerOptions {
 	return func(s *Server) {
-		s.profileApi = si
+		if len(mw) == 0 {
+			return
+		}
+		s.middlewares = append(s.middlewares, mw...)
 	}
 }
 
@@ -97,70 +106,27 @@ func New(host string, port int, opts ...ServerOptions) (*Server, error) {
 	s.server = &http.Server{
 		Addr: net.JoinHostPort(host, strconv.Itoa(port)),
 	}
+	// Allocate a base mux before applying options so options can register routes.
+	s.mux = http.NewServeMux()
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
-	mux := http.NewServeMux()
-
-	// TODO: feature flag this
-	//
-	// For now, register all the apis
-	//
-	// Risks path collision if the profile api and payment apis specs
-	// are of two different files (different teams, etc.)
-	if s.profileApi != nil {
-		// Build a "strict" handler for the profile API which wraps our
-		// implementation with request/response de/serialization and
-		// RFC7807 error mapping.
-		//
-		// This returns a profile_api.ServerInterface that the stdlib router can use.
-		strict := profile_api.NewStrictHandlerWithOptions(
-			s.profileApi,
-			[]profile_api.StrictMiddlewareFunc{},
-			profile_api.StrictHTTPServerOptions{
-				RequestErrorHandlerFunc:  profile_service.ProblemDetailsRequestErrorHandler,
-				ResponseErrorHandlerFunc: profile_service.ProblemDetailsResponseErrorHandler,
-			},
-		)
-
-		// Register routes onto our existing mux.
-		//
-		// Note: HandlerWithOptions returns an http.Handler, but when
-		// StdHTTPServerOptions.BaseRouter is provided, it mutates that
-		// router in place (attaches HandleFunc bindings) and returns the
-		// same router.
-		//
-		// Because we pass BaseRouter: mux below, the registration
-		// side-effects occur on "mux" directly, so it is both
-		// safe and intentional to ignore the returned handler here.
-		//
-		// If BaseRouter were nil, HandlerWithOptions would allocate a new
-		// *http.ServeMux and return it, and in that case we would need to
-		// capture and use the returned handler.
-		profile_api.HandlerWithOptions(
-			strict,
-			profile_api.StdHTTPServerOptions{
-				BaseRouter:       mux,
-				Middlewares:      []profile_api.MiddlewareFunc{},
-				ErrorHandlerFunc: profile_service.ProblemDetailsRequestErrorHandler,
-			},
-		)
-
-		slog.Info("configured profile api")
-
-	}
-	if s.paymentApi != nil {
-		payment_api.HandlerFromMux(s.paymentApi, mux)
-
-		slog.Info("configured payment api")
+	// Register all services and collect their required global middlewares.
+	for _, svc := range s.services {
+		svc.Register(s.mux)
+		s.middlewares = append(s.middlewares, svc.Middlewares()...)
+		slog.Info("registered service", slog.String("type", fmt.Sprintf("%T", svc)))
 	}
 
-	// Wrap the entire mux so validation (sets defaults) runs before param binding,
-	validated := profile_service.ProfileHTTPValidationMiddleware()(mux)
-	// then apply global panic-recover middleware.
-	s.server.Handler = profile_service.RecoverHTTPMiddleware()(validated)
+	// Build handler chain: middlewares wrap the mux in declaration order.
+	handler := http.Handler(s.mux)
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		handler = s.middlewares[i](handler)
+	}
+	// Attach the composed handler chain. Consumers can add recover/logging via options.
+	s.server.Handler = handler
 
 	return s, nil
 }

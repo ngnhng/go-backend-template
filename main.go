@@ -21,6 +21,7 @@ import (
 	hmacsign "app/hmac"
 	profile_service "app/profile-service"
 	"app/server"
+	"app/services"
 	"context"
 	"log/slog"
 
@@ -33,7 +34,7 @@ import (
 )
 
 type HMACConfig struct {
-	secret string `env:"HMAC_SECRET,notEmpty"`
+	Secret string `env:"HMAC_SECRET,notEmpty"`
 }
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 		slog.ErrorContext(ctx, "hmac key not configured")
 		os.Exit(1)
 	}
-	signer, err := hmacsign.NewHMACSigner([]byte(hmacConfig.secret))
+	signer, err := hmacsign.NewHMACSigner([]byte(hmacConfig.Secret))
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac signer setup error", slog.Any("error", err))
 		os.Exit(1)
@@ -81,10 +82,14 @@ func main() {
 	profileApi := profile_service.NewProfileService(
 		postgresConnectionPool, postgresProfilePersistence, signer)
 
+	// Compose enabled services
+	profileSvc := services.NewProfileAPIService(profileApi)
+
 	server, err := server.New(
 		"0.0.0.0", 8080,
 		server.WithWriteTimeout(10*time.Second),
-		server.WithProfileApi(profileApi),
+		server.WithServices(profileSvc),
+		server.WithGlobalMiddlewares(profile_service.RecoverHTTPMiddleware()),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "init server error", slog.Any("error", err))
