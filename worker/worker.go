@@ -29,21 +29,32 @@ type Worker[Job any] func(context.Context, Job)
 //
 // Use a goroutine worker pool when:
 //
-// The workload is unbounded or high volume. A pool prevents uncontrolled goroutine growth, which can lead to memory exhaustion, GC pressure, and unpredictable performance.
+// The workload is unbounded or high volume. A pool prevents uncontrolled goroutine growth,
+// which can lead to memory exhaustion, GC pressure, and unpredictable performance.
 //
-// Unbounded concurrency risks resource saturation. Capping the number of concurrent workers helps avoid overwhelming the CPU, network, database, or disk I/O—especially under load.
+// Unbounded concurrency risks resource saturation. Capping the number of concurrent
+// workers helps avoid overwhelming the CPU, network, database, or disk I/O—especially
+// under load.
 //
-// You need predictable parallelism for stability. Limiting concurrency smooths out performance spikes and keeps system behavior consistent, even during traffic surges.
+// You need predictable parallelism for stability. Limiting concurrency smooths out
+// performance spikes and keeps system behavior consistent, even during traffic surges.
 //
-// Tasks are relatively uniform and queue-friendly. When task cost is consistent, a fixed pool size provides efficient scheduling with minimal overhead, ensuring good throughput without complex coordination.
+// Tasks are relatively uniform and queue-friendly. When task cost is consistent, a fixed
+// pool size provides efficient scheduling with minimal overhead, ensuring good throughput
+// without complex coordination.
 //
 // Avoid a worker pool when:
 //
-// Each task must be processed immediately with minimal latency. Queuing in a worker pool introduces delay. For latency-critical tasks, direct goroutine spawning avoids the scheduling overhead.
+// Each task must be processed immediately with minimal latency. Queuing in a worker pool
+// introduces delay. For latency-critical tasks, direct goroutine spawning avoids the
+// scheduling overhead.
 //
-// You can rely on Go's scheduler for natural load balancing in low-load scenarios. In light workloads, the overhead of managing a pool may outweigh its benefits. Go’s scheduler can often handle lightweight parallelism efficiently on its own.
+// You can rely on Go's scheduler for natural load balancing in low-load scenarios. In
+// light workloads, the overhead of managing a pool may outweigh its benefits. Go’s
+// scheduler can often handle lightweight parallelism efficiently on its own.
 //
-// Workload volume is small and bounded. Spinning up goroutines directly keeps code simpler for limited, predictable workloads without risking uncontrolled growth.
+// Workload volume is small and bounded. Spinning up goroutines directly keeps code
+// simpler for limited, predictable workloads without risking uncontrolled growth.
 func BlockingPool[Job any](ctx context.Context, size int, jobs <-chan Job, worker Worker[Job]) {
 	if size <= 0 {
 		size = 1
