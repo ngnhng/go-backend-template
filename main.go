@@ -24,25 +24,27 @@ import (
 	profile_service "app/profile-service"
 	"app/server"
 	"app/services"
+
 	"context"
 	"log/slog"
-
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/caarlos0/env/v11"
-)
 
-type HMACConfig struct {
-	Secret string `env:"HMAC_SECRET,notEmpty"`
-}
+	autosdk "go.opentelemetry.io/auto/sdk"
+	"go.opentelemetry.io/otel"
+)
 
 func main() {
 	// cancel the context when these signals occur
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, os.Interrupt)
 	defer cancel()
+
+	tp := autosdk.TracerProvider()
+	otel.SetTracerProvider(tp)
 
 	// manual dependency injections, imo there's no need to over-engineer with DI frameworks like Fx or Wire
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -64,7 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	hmacConfig, err := env.ParseAs[HMACConfig]()
+	hmacConfig, err := env.ParseAs[hmacsign.HMACConfig]()
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac key not configured")
 		os.Exit(1)
