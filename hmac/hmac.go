@@ -22,6 +22,10 @@ import (
 	"strings"
 )
 
+type HMACConfig struct {
+	Secret string `env:"HMAC_SECRET,notEmpty"`
+}
+
 type HMACSigner struct {
 	key []byte
 }
