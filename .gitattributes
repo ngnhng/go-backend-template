@@ -1,0 +1,8 @@
+# Ensure all .sh files use LF line endings, even on Windows
+*.sh eol=lf
+
+# Ensure specific configuration files use LF line endings
+config.ini eol=lf
+
+# For files that should be treated as binary and never have line endings modified
+*.jpg binary
