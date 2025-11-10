@@ -13,12 +13,10 @@
 # limitations under the License.
 #
 volumes:
-  prometheus_data: {}
-  clickhouse_data: {}
-  clickhouse_logs: {}
-  coroot_data: {}
+  vm_data: {}
+  vmagent_data: {}
+  grafana_data: {}
   node_agent_data: {}
-  cluster_agent_data: {}
   pg18-primary-data: {}
   pg18-replica-data: {}
 
@@ -119,25 +117,56 @@ services:
       - all
 
   # --- Observability ---
-  coroot:
-    restart: no
-    image: ghcr.io/coroot/coroot${LICENSE_KEY:+-ee} # set 'coroot-ee' as the image if LICENSE_KEY is defined
-    pull_policy: if_not_present
-    user: root
-    volumes:
-      - coroot_data:/data
-    ports:
-      - 8082:8080
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics
+    restart: unless-stopped
     command:
-      - "--data-dir=/data"
-      - "--bootstrap-prometheus-url=http://prometheus:9090"
-      - "--bootstrap-refresh-interval=15s"
-      - "--bootstrap-clickhouse-address=clickhouse:9000"
-    environment:
-      - LICENSE_KEY=${LICENSE_KEY:-}
+      - --storageDataPath=/vm-data
+      - --retentionPeriod=15d
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/vm-data
+
+  vmagent:
+    image: victoriametrics/vmagent
+    restart: unless-stopped
+    command:
+      - -promscrape.config=/etc/prometheus/prometheus.yml
+      - -remoteWrite.url=http://victoria-metrics:8428/api/v1/write
+    volumes:
+      - ./deployment/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - vmagent_data:/vmagent-data
     depends_on:
-      - clickhouse
-      - prometheus
+      - victoria-metrics
+
+  vmalert:
+    image: victoriametrics/vmalert
+    restart: unless-stopped
+    command:
+      - -rule=/etc/vmalert/coroot-rules.yml
+      - -datasource.url=http://victoria-metrics:8428
+      - -remoteWrite.url=http://victoria-metrics:8428
+    volumes:
+      - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
+    depends_on:
+      - victoria-metrics
+  grafana:
+    image: grafana/grafana
+    restart: no
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployment/local/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deployment/local/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deployment/local/grafana/dashboards/coroot:/var/lib/grafana/dashboards/coroot:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - victoria-metrics
     profiles:
       - observability
       - all
@@ -157,58 +186,6 @@ services:
       - "--collector-endpoint=http://coroot:8080"
       - "--cgroupfs-root=/host/sys/fs/cgroup"
       - "--wal-dir=/data"
-    profiles:
-      - observability
-      - all
-
-  cluster-agent:
-    restart: no
-    image: ghcr.io/coroot/coroot-cluster-agent
-    pull_policy: if_not_present
-    volumes:
-      - cluster_agent_data:/data
-    command:
-      - "--coroot-url=http://coroot:8080"
-      - "--metrics-scrape-interval=15s"
-      - "--metrics-wal-dir=/data"
-    depends_on:
-      - coroot
-    profiles:
-      - observability
-      - all
-
-  prometheus:
-    restart: no
-    image: prom/prometheus:v2.53.5
-    volumes:
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--web.enable-lifecycle"
-      - "--web.enable-remote-write-receiver"
-    ports:
-      - "127.0.0.1:9090:9090"
-    profiles:
-      - observability
-      - all
-
-  clickhouse:
-    restart: no
-    image: clickhouse/clickhouse-server:24.3
-    environment:
-      CLICKHOUSE_SKIP_USER_SETUP: "1"
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - clickhouse_logs:/var/log/clickhouse-server
-    ports:
-      - "127.0.0.1:9000:9000"
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
     profiles:
       - observability
       - all

@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "node-agent"
+    static_configs:
+      - targets: ["node-agent:8000"]
