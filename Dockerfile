@@ -1,7 +1,9 @@
 FROM golang:1.25-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server .
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -ldflags="-w -s" -o /app/server .
 
 FROM gcr.io/distroless/static-debian12
 USER nonroot:nonroot

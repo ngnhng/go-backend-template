@@ -21,30 +21,33 @@ volumes:
   pg18-replica-data: {}
 
 services:
-  app:
+  profile-api:
     build:
       context: .
-      dockerfile: ./deployment/local/app/Dockerfile
+      dockerfile: ./deployment/local/profile-api/Dockerfile
       target: app-local
     restart: "no"
     shm_size: 256mb
     environment:
-      OTEL_SERVICE_NAME: "my-app"
+      OTEL_SERVICE_NAME: "profile-api"
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,service.version=dev"
       OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://coroot:4317"
       OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://coroot:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       POSTGRES_PRIMARY_HOST: "postgres-primary"
       POSTGRES_PRIMARY_PORT: "5432"
+      POSTGRES_PRIMARY_DATABASE: "profiledb"
       POSTGRES_REPLICA_0_HOST: "postgres-replica"
       POSTGRES_REPLICA_0_PORT: "5432"
+      POSTGRES_REPLICA_0_DATABASE: "profiledb"
     ports:
       - "8080:8080"
     depends_on:
       - postgres-primary
       - postgres-replica
     profiles:
-      - app
+      - profile-api
       - all
   # --- Application dependencies ---
   postgres-primary:
@@ -70,7 +73,6 @@ services:
       - all
 
   postgres-replica:
-    user: root
     image: postgres:18-alpine
     restart: "no"
     shm_size: 128mb
@@ -128,6 +130,7 @@ services:
     volumes:
       - vm_data:/vm-data
 
+  # Drop-in replacement for Prometheus when we only need scraping and remote write
   vmagent:
     image: victoriametrics/vmagent
     restart: unless-stopped
@@ -151,6 +154,7 @@ services:
       - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
     depends_on:
       - victoria-metrics
+
   grafana:
     image: grafana/grafana
     restart: no
@@ -183,7 +187,7 @@ services:
       - /sys/fs/cgroup:/host/sys/fs/cgroup
       - node_agent_data:/data
     command:
-      - "--collector-endpoint=http://coroot:8080"
+      - "--listen=0.0.0.0:8000"
       - "--cgroupfs-root=/host/sys/fs/cgroup"
       - "--wal-dir=/data"
     profiles:

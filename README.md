@@ -1,5 +1,7 @@
 ## High-level design
 
+## Deployment
+
 ## Choosing between RESTful HTTP and GraphQL
 
 ## Designing RESTful HTTP APIs
@@ -119,13 +121,13 @@ Persistence layer (`profile-service/persistence.go`)
 - Maps Postgres constraint violations (e.g., `pgerrcode.UniqueViolation` 23505) to sentinel errors (`ErrDuplicateEntry`).
 - Defers policy decisions to the application layer where domain errors are chosen and then mapped to RFC7807.
 
-## Distributed transaction
-
 ## Event sourcing
 
 ## Serverless patterns
 
 ### Lambda
+
+## Docker image
 
 ## Local Development
 
