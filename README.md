@@ -1,5 +1,7 @@
 ## High-level design
 
+Services in this repository will combine aspects of layered architecture, domain-driven and hexagonal (ports and adapters) to try to produce a readable and maintainable source code.
+
 ## Deployment
 
 ## Choosing between RESTful HTTP and GraphQL

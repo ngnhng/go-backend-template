@@ -68,7 +68,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -123,7 +123,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n    label_replace(\n      label_replace(\n        container_net_tcp_successful_connects_total{cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\"},\n        \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n  ),\n  \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n)\n* on (actual_destination, cluster_name) group_left(\n    destination_namespace,\n    destination_pod,\n    destination_container,\n    destination_ip,\n    destination_port,\n    destination_controller\n) (\n  label_replace(\n    label_replace(\n      label_replace(\n          label_replace(\n              label_replace(\n                  label_replace(\n                      label_replace(\n                          container_net_tcp_listen_info{cluster_name=~\"$cluster\", container_id=~\"/k8s/${destination_namespace}/.*\"},\n                          \"actual_destination\", \"$1\", \"listen_addr\", \"(.*)\"\n                      ),\n                      \"destination_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n                  ),\n                  \"destination_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n              ),\n              \"destination_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n          ),\n          \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n      ),\n      \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n    ),\n  \"destination_controller\", \"$1\", \"destination_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)",
@@ -301,7 +301,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -356,7 +356,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n    label_replace(\n      label_replace(\n        container_net_tcp_successful_connects_total{cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\"},\n        \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n  ),\n  \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n)\n* on (actual_destination, cluster_name) group_left(\n    destination_namespace,\n    destination_pod,\n    destination_container,\n    destination_ip,\n    destination_port,\n    destination_controller\n) (\n  label_replace(\n    label_replace(\n      label_replace(\n          label_replace(\n              label_replace(\n                  label_replace(\n                      label_replace(\n                          container_net_tcp_listen_info{cluster_name=~\"$cluster\", container_id=~\"/k8s/${destination_namespace}/.*\"},\n                          \"actual_destination\", \"$1\", \"listen_addr\", \"(.*)\"\n                      ),\n                      \"destination_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n                  ),\n                  \"destination_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n              ),\n              \"destination_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n          ),\n          \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n      ),\n      \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n    ),\n  \"destination_controller\", \"$1\", \"destination_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)",
@@ -613,7 +613,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -682,7 +682,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "group by (cluster_name, source_namespace, source_pod, source_container, source_controller, destination_ip, destination_port) (\n  label_replace(\n    label_replace(\n      label_replace(\n        label_replace(\n          label_replace(\n            label_replace(\n            container_net_tcp_successful_connects_total{\n                cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\",\n            },\n            \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n            ),\n            \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n          ),\n          \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n        ),\n        \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)\n* on (destination_ip, cluster_name) group_left(fqdn) (\n  group by (cluster_name, destination_ip, fqdn) (\n    label_replace(\n        topk(1, ip_to_fqdn{cluster_name=~\"$cluster\"}) by (ip),\n        \"destination_ip\", \"$1\", \"ip\", \"(.*)\"\n    )\n  )\n)",
@@ -845,7 +845,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -913,7 +913,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "group by (cluster_name, source_namespace, source_pod, source_container, source_controller, destination_ip, destination_port) (\n  label_replace(\n    label_replace(\n      label_replace(\n        label_replace(\n          label_replace(\n            label_replace(\n            container_net_tcp_successful_connects_total{\n                cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\",\n            },\n            \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n            ),\n            \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n          ),\n          \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n        ),\n        \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)\n* on (destination_ip, cluster_name) group_left(fqdn) (\n  group by (cluster_name, destination_ip, fqdn) (\n    label_replace(\n        topk(1, ip_to_fqdn{cluster_name=~\"$cluster\", fqdn!~\"$negative_regex\"}) by (ip),\n        \"destination_ip\", \"$1\", \"ip\", \"(.*)\"\n    )\n  )\n)",
@@ -1071,7 +1071,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1127,7 +1127,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n    group by (cluster_name, source_namespace, source_pod, source_container, source_controller, destination_ip, destination_port) (\n  label_replace(\n    label_replace(\n      label_replace(\n        label_replace(\n          label_replace(\n            label_replace(\n            container_net_tcp_successful_connects_total{\n                cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\",\n            },\n            \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n            ),\n            \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n          ),\n          \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n        ),\n        \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)\n* on (destination_ip, cluster_name) group_left(fqdn) (\n  group by (cluster_name, destination_ip, fqdn) (\n    label_replace(\n        topk(1, ip_to_fqdn{cluster_name=~\"$cluster\", fqdn!~\"$negative_regex\"}) by (ip),\n        \"destination_ip\", \"$1\", \"ip\", \"(.*)\"\n    )\n  )\n),\n    \"domain\", \"$2$3\", \"fqdn\", \"(.*\\\\.)?([^.]+\\\\.)([^.]+)$\"\n  ),\n  \"subdomain\", \"$1\", \"fqdn\", \"(.*)\\\\.([^.]+\\\\.)([^.]+)$\"\n)",
@@ -1308,7 +1308,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1363,7 +1363,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "group by (cluster_name, source_namespace, source_pod, source_container, source_controller, destination_ip, destination_port) (\n  label_replace(\n    label_replace(\n      label_replace(\n        label_replace(\n          label_replace(\n            label_replace(\n            container_net_tcp_successful_connects_total{\n                cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\",\n            },\n            \"destination_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n            ),\n            \"destination_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n          ),\n          \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n        ),\n        \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"source_controller\", \"$1\", \"source_pod\", \"(.+?)(-[^-]+)?$\"\n  )\n)\n* on (destination_ip, cluster_name) group_left(fqdn) (\n  group by (cluster_name, destination_ip, fqdn) (\n    label_replace(\n        topk(1, ip_to_fqdn{cluster_name=~\"$cluster\"}) by (ip),\n        \"destination_ip\", \"$1\", \"ip\", \"(.*)\"\n    )\n  )\n)",
@@ -1536,7 +1536,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1591,7 +1591,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n    label_replace(\n      label_replace(\n        label_replace(\n          container_net_tcp_listen_info{cluster_name=~\"$cluster\", container_id=~\"/k8s/${source_namespace}/.*\"},\n          \"source_container\", \"$4\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n        ),\n        \"source_pod\", \"$3\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n      ),\n      \"source_namespace\", \"$2\", \"container_id\", \"/([^/]+)/([^/]+)/([^/]+)/([^/]+)\"\n    ),\n    \"ip\", \"$1\", \"listen_addr\", \"([^:]+):.*\"\n  ),\n  \"port\", \"$1\", \"listen_addr\", \"[^:]+:([0-9]+)\"\n)",
@@ -1728,7 +1728,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1783,7 +1783,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "kube_endpoint_address{cluster_name=~\"$cluster\", namespace=~\"$source_namespace\"}",
@@ -1877,7 +1877,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1932,7 +1932,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n          container_net_tcp_listen_info{cluster_name=~\"$cluster\", container_id=~\"/system.slice/.*\", listen_addr=~\"(\\\\d{1,3}\\\\.){3}\\\\d{1,3}:\\\\d+\"},\n    \"ip\", \"$1\", \"listen_addr\", \"([^:]+):.*\"\n  ),\n  \"port\", \"$1\", \"listen_addr\", \"[^:]+:([0-9]+)\"\n)",
@@ -2086,7 +2086,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2141,7 +2141,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
           "expr": "label_replace(\n  label_replace(\n    label_replace(\n      label_replace(\n              container_net_tcp_successful_connects_total{\n                cluster_name=~\"$cluster\", container_id=~\"/system.slice/.*\"\n              },\n        \"actual_ip\", \"$1\", \"actual_destination\", \"([^:]+):.*\"\n      ),\n      \"actual_port\", \"$1\", \"actual_destination\", \"[^:]+:([0-9]+)\"\n    ),\n    \"ip\", \"$1\", \"destination\", \"([^:]+):.*\"\n  ),\n  \"port\", \"$1\", \"destination\", \"[^:]+:([0-9]+)\"\n)",
@@ -2297,7 +2297,7 @@
     "list": [
       {
         "current": {},
-        "name": "datasource",
+        "name": "Datasource",
         "options": [],
         "query": "prometheus",
         "refresh": 1,
@@ -2309,7 +2309,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+          "uid": "${Datasource}"
         },
         "definition": "label_values(kube_node_info,cluster_name)",
         "includeAll": false,
@@ -2330,7 +2330,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+          "uid": "${Datasource}"
         },
         "definition": "label_values(kube_pod_info{cluster_name=\"$cluster\"},namespace)",
         "includeAll": true,
@@ -2352,7 +2352,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_VICTORIA-P01-PRODUCTION}"
+          "uid": "${Datasource}"
         },
         "definition": "label_values(kube_pod_info{cluster_name=\"$cluster\"},namespace)",
         "includeAll": true,
