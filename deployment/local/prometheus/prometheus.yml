@@ -4,4 +4,4 @@ global:
 scrape_configs:
   - job_name: "coroot-node-agent"
     static_configs:
-      - targets: ["coroot-node-agent:8000"]
+      - targets: ["node-agent:8000"]

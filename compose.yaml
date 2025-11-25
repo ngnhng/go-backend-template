@@ -16,9 +16,9 @@ volumes:
   grafana_data: {}
   pg18-primary-data: {}
   pg18-replica-data: {}
-  loki_data: {}
-  mimir_data: {}
+  node_agent_data: {}
   tempo_data: {}
+  vm_data: {}
 
 services:
   profile-api:
@@ -119,34 +119,6 @@ services:
       - all
 
   # --- Observability ---
-  mimir:
-    image: grafana/mimir
-    restart: unless-stopped
-    command:
-      - -config.file=/etc/mimir/mimir.yaml
-    volumes:
-      - ./deployment/local/mimir/config.yaml:/etc/mimir/mimir.yaml:ro
-      - mimir_data:/mimir
-    ports:
-      - "9009:9009"
-    profiles:
-      - observability
-      - all
-
-  loki:
-    image: grafana/loki
-    restart: unless-stopped
-    command:
-      - -config.file=/etc/loki/config.yaml
-    volumes:
-      - ./deployment/local/loki/config.yaml:/etc/loki/config.yaml:ro
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-    profiles:
-      - observability
-      - all
-
   tempo:
     image: grafana/tempo
     restart: unless-stopped
@@ -157,24 +129,6 @@ services:
       - tempo_data:/var/tempo
     ports:
       - "3200:3200"
-    profiles:
-      - observability
-      - all
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib
-    restart: unless-stopped
-    command:
-      - --config=/etc/otelcol/config.yaml
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-    volumes:
-      - ./deployment/local/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
-    depends_on:
-      - tempo
-      - loki
-      - mimir
     profiles:
       - observability
       - all
@@ -191,10 +145,58 @@ services:
       - ./deployment/local/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     ports:
       - "3000:3000"
-    depends_on:
-      - loki
-      - tempo
-      - mimir
     profiles:
       - observability
       - all
+
+  node-agent:
+    restart: no
+    image: ghcr.io/coroot/coroot-node-agent
+    pull_policy: if_not_present
+    privileged: true
+    pid: "host"
+    volumes:
+      - /sys/kernel/tracing:/sys/kernel/tracing
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/fs/cgroup:/host/sys/fs/cgroup
+      - node_agent_data:/data
+    command:
+      - "--listen=0.0.0.0:8000"
+      - "--cgroupfs-root=/host/sys/fs/cgroup"
+      - "--wal-dir=/data"
+    profiles:
+      - observability
+      - all
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics
+    command:
+      - --storageDataPath=/vm-data
+      - --retentionPeriod=15d
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/vm-data
+
+  vmagent:
+    image: victoriametrics/vmagent
+    command:
+      - -promscrape.config=/etc/prometheus/prometheus.yml
+      - -remoteWrite.url=http://victoria-metrics:8428/api/v1/write
+    volumes:
+      - ./deployment/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - victoria-metrics
+      - node-agent
+
+  vmalert:
+    image: victoriametrics/vmalert
+    command:
+      - -rule=/etc/vmalert/coroot-rules.yml
+      - -datasource.url=http://victoria-metrics:8428
+      - -remoteWrite.url=http://victoria-metrics:8428
+      - -evaluationInterval=15s
+    volumes:
+      - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
+    depends_on:
+      - victoria-metrics
