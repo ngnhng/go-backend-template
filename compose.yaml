@@ -13,12 +13,12 @@
 # limitations under the License.
 #
 volumes:
-  vm_data: {}
-  vmagent_data: {}
   grafana_data: {}
-  node_agent_data: {}
   pg18-primary-data: {}
   pg18-replica-data: {}
+  loki_data: {}
+  mimir_data: {}
+  tempo_data: {}
 
 services:
   profile-api:
@@ -32,8 +32,8 @@ services:
       OTEL_SERVICE_NAME: "profile-api"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,service.version=dev"
       OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://coroot:4317"
-      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://coroot:4317"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       POSTGRES_PRIMARY_HOST: "postgres-primary"
       POSTGRES_PRIMARY_PORT: "5432"
@@ -119,77 +119,82 @@ services:
       - all
 
   # --- Observability ---
-  victoria-metrics:
-    image: victoriametrics/victoria-metrics
+  mimir:
+    image: grafana/mimir
     restart: unless-stopped
     command:
-      - --storageDataPath=/vm-data
-      - --retentionPeriod=15d
+      - -config.file=/etc/mimir/mimir.yaml
+    volumes:
+      - ./deployment/local/mimir/config.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir_data:/mimir
     ports:
-      - "8428:8428"
-    volumes:
-      - vm_data:/vm-data
+      - "9009:9009"
+    profiles:
+      - observability
+      - all
 
-  # Drop-in replacement for Prometheus when we only need scraping and remote write
-  vmagent:
-    image: victoriametrics/vmagent
+  loki:
+    image: grafana/loki
     restart: unless-stopped
     command:
-      - -promscrape.config=/etc/prometheus/prometheus.yml
-      - -remoteWrite.url=http://victoria-metrics:8428/api/v1/write
+      - -config.file=/etc/loki/config.yaml
     volumes:
-      - ./deployment/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - vmagent_data:/vmagent-data
-    depends_on:
-      - victoria-metrics
+      - ./deployment/local/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    profiles:
+      - observability
+      - all
 
-  vmalert:
-    image: victoriametrics/vmalert
+  tempo:
+    image: grafana/tempo
     restart: unless-stopped
     command:
-      - -rule=/etc/vmalert/coroot-rules.yml
-      - -datasource.url=http://victoria-metrics:8428
-      - -remoteWrite.url=http://victoria-metrics:8428
+      - -config.file=/etc/tempo/config.yaml
     volumes:
-      - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
+      - ./deployment/local/tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+    profiles:
+      - observability
+      - all
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    restart: unless-stopped
+    command:
+      - --config=/etc/otelcol/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./deployment/local/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
     depends_on:
-      - victoria-metrics
+      - tempo
+      - loki
+      - mimir
+    profiles:
+      - observability
+      - all
 
   grafana:
     image: grafana/grafana
     restart: no
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deployment/local/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deployment/local/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./deployment/local/grafana/dashboards/coroot:/var/lib/grafana/dashboards/coroot:ro
     ports:
       - "3000:3000"
     depends_on:
-      - victoria-metrics
-    profiles:
-      - observability
-      - all
-
-  node-agent:
-    restart: no
-    image: ghcr.io/coroot/coroot-node-agent
-    pull_policy: if_not_present
-    privileged: true
-    pid: "host"
-    volumes:
-      - /sys/kernel/tracing:/sys/kernel/tracing
-      - /sys/kernel/debug:/sys/kernel/debug
-      - /sys/fs/cgroup:/host/sys/fs/cgroup
-      - node_agent_data:/data
-    command:
-      - "--listen=0.0.0.0:8000"
-      - "--cgroupfs-root=/host/sys/fs/cgroup"
-      - "--wal-dir=/data"
+      - loki
+      - tempo
+      - mimir
     profiles:
       - observability
       - all

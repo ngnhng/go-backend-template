@@ -1,20 +1,27 @@
 apiVersion: 1
 
 datasources:
-  - name: VictoriaMetrics
-    uid: victoria-metrics
+  - name: Mimir
+    uid: mimir
     type: prometheus
     access: proxy
-    url: http://victoria-metrics:8428
+    url: http://mimir:9009/prometheus
     isDefault: true
     editable: false
     jsonData:
-      timeInterval: 15s
-  - name: Victoria-p01-production
-    uid: DS_VICTORIA-P01-PRODUCTION
-    type: prometheus
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: Tempo
+          datasourceUid: tempo
+  - name: Loki
+    uid: loki
+    type: loki
     access: proxy
-    url: http://victoria-metrics:8428
+    url: http://loki:3100
     editable: false
-    jsonData:
-      timeInterval: 15s
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false

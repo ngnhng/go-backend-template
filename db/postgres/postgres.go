@@ -35,6 +35,8 @@ import (
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/postgres"
 )
 
+var _ db.ConnectionPool = (*PostgresConnectionPool)(nil)
+
 type (
 	PostgresConnectionPool struct {
 		writer *sqlx.DB
@@ -76,11 +78,7 @@ func (p *PostgresConnectionPool) HealthCheck() bool {
 
 	// TODO: Make this query configurable
 	_, err = conn.ExecContext(ctx, "SELECT 1")
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err != nil
 }
 
 // MigrateDown implements db.ConnectionPool.
@@ -135,15 +133,15 @@ func (p *PostgresConnectionPool) WithTimeoutTx(ctx context.Context, timeout time
 		}
 	}()
 
-    if err = fn(ctx, tx); err != nil {
-        rbErr := tx.Rollback()
-        if rbErr != nil && rbErr != sql.ErrTxDone {
-            return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
-        }
-        return err
-    }
+	if err = fn(ctx, tx); err != nil {
+		rbErr := tx.Rollback()
+		if rbErr != nil && rbErr != sql.ErrTxDone {
+			return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
+		}
+		return err
+	}
 
-    return tx.Commit()
+	return tx.Commit()
 }
 
 // WithTx implements db.ConnectionPool.
@@ -163,23 +161,21 @@ func (p *PostgresConnectionPool) WithTx(ctx context.Context, fn func(context.Con
 		}
 	}()
 
-    if err = fn(ctx, tx); err != nil {
-        rbErr := tx.Rollback()
-        if rbErr != nil && rbErr != sql.ErrTxDone {
-            return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
-        }
-        return err
-    }
+	if err = fn(ctx, tx); err != nil {
+		rbErr := tx.Rollback()
+		if rbErr != nil && rbErr != sql.ErrTxDone {
+			return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
+		}
+		return err
+	}
 
-    return tx.Commit()
+	return tx.Commit()
 }
 
 // Writer implements db.ConnectionPool.
 func (p *PostgresConnectionPool) Writer() *sqlx.DB {
 	return p.writer
 }
-
-var _ db.ConnectionPool = (*PostgresConnectionPool)(nil)
 
 // Example:
 // postgres://jack:secret@pg.example.com:5432/mydb?sslmode=verify-ca&pool_max_conns=10&pool_max_conn_lifetime=1h30m

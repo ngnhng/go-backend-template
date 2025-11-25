@@ -1,0 +1,58 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+
+common:
+  path_prefix: /loki
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: memberlist
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+
+memberlist:
+  join_members:
+    - loki
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+  filesystem:
+    directory: /loki/chunks
+
+limits_config:
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  max_global_streams_per_user: 0
+  max_cache_freshness_per_query: 10m
+
+compactor:
+  working_directory: /loki/boltdb-shipper-compactor
+
+ruler:
+  alertmanager_url: http://localhost
+  rule_path: /loki/rules
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  ring:
+    kvstore:
+      store: memberlist
+  enable_api: true

@@ -1,0 +1,43 @@
+server:
+  log_level: info
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+
+multitenancy_enabled: false
+target: all
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /mimir/storage
+
+memberlist:
+  join_members:
+    - mimir
+
+ingester:
+  ring:
+    replication_factor: 1
+    kvstore:
+      store: memberlist
+
+compactor:
+  data_dir: /mimir/compactor
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /mimir/blocks
+  tsdb:
+    dir: /mimir/tsdb
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /mimir/rules
+
+alertmanager_storage:
+  backend: filesystem
+  filesystem:
+    dir: /mimir/alerts
