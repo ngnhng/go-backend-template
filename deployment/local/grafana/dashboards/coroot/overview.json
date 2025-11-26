@@ -19,8 +19,8 @@
     },
     {
       "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
+      "id": "victoria-metrics",
+      "name": "VictoriaMetrics",
       "version": "1.0.0"
     },
     {

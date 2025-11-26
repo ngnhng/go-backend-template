@@ -1,12 +1,10 @@
 apiVersion: 1
 
 datasources:
-  # 1. TRACES (Define this FIRST so others can link to it)
-  # ----------------------------------------------------
   - name: VictoriaTraces
     type: jaeger
     access: proxy
-    url: http://victoria-traces:8429
+    url: http://victoria-traces:8429/select/jaeger
     uid: victoria-traces
     basicAuth: false
     isDefault: false
@@ -20,8 +18,6 @@ datasources:
         spanStartTimeShift: "-1h"
         spanEndTimeShift: "1h"
 
-  # 2. LOGS (VictoriaLogs)
-  # ----------------------
   - name: VictoriaLogs
     type: victoriametrics-logs-datasource
     access: proxy
@@ -35,8 +31,6 @@ datasources:
           name: TraceID
           url: "$${__value.raw}"
 
-  # 3. METRICS (VictoriaMetrics)
-  # ----------------------------
   - name: VictoriaMetrics
     type: prometheus
     access: proxy
