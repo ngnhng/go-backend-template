@@ -1,5 +1,7 @@
 ## High-level design
 
+Very opinionated setup with specific toolings and conventions that you may or may not like.
+
 Services in this repository will combine aspects of layered architecture, domain-driven and hexagonal (ports and adapters) to try to produce a readable and maintainable source code.
 
 ## Deployment

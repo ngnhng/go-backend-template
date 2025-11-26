@@ -32,7 +32,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
-	profile_service "app/core/profile-service"
+	profile_service "app/core/profile"
 	hmacsign "app/hmac"
 )
 

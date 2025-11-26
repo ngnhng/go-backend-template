@@ -16,7 +16,7 @@ package services
 
 import (
 	profileapi "app/api/profileapi/stdlib"
-	profile_service "app/core/profile-service"
+	profile_service "app/core/profile"
 	"net/http"
 )
 
