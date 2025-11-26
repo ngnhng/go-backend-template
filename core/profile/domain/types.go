@@ -1,9 +1,10 @@
-package profile_service
+package domain
 
 import (
-	"app/db"
 	"database/sql"
 	"time"
+
+	"app/db"
 
 	"github.com/gofrs/uuid/v5"
 )
@@ -22,15 +23,6 @@ type (
 		Email     string
 		Age       sql.NullInt32
 		CreatedAt time.Time
-	}
-
-	// ProfileRow is the persistence entity shape used by storage adapters.
-	ProfileRow struct {
-		ID        uuid.UUID     `db:"id"`
-		Name      string        `db:"username"`
-		Email     string        `db:"email"`
-		Age       sql.NullInt32 `db:"age"`
-		CreatedAt time.Time     `db:"created_at"`
 	}
 )
 

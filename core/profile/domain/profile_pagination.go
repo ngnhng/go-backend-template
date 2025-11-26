@@ -1,4 +1,4 @@
-package profile_service
+package domain
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func (app *Application) decodeCursorToken(s string) (*CursorPaginationToken, err
 	return &tok, nil
 }
 
-func (app *Application) makeCursorFromProfile(p Profile, dir CursorDirection, ttl time.Duration) string {
+func (app *Application) MakeCursorFromProfile(p Profile, dir CursorDirection, ttl time.Duration) string {
 	tok := &CursorPaginationToken{
 		TTL:       time.Now().Add(ttl),
 		Direction: dir,

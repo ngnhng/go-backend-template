@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package profile_service
+package http
 
 import (
-	"app/api/serde"
-	"app/db"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
+
+	"app/api/serde"
+	"app/core/profile/domain"
+	"app/db"
 
 	api "app/api/profileapi/stdlib"
 
@@ -33,7 +35,7 @@ import (
 
 // Controller implementation of the oapi-codegen generated HTTP API handlers
 type ProfileAPI struct {
-	app *Application
+	app *domain.Application
 }
 
 // Strict server interface reduces the boilerplate marshaling of request/response data thus enforcing better type-safety
@@ -45,12 +47,12 @@ func (p *ProfileAPI) CreateProfile(ctx context.Context, request api.CreateProfil
 	if err != nil {
 		prob := ProblemFromDomainError(err)
 		slog.DebugContext(ctx, "domain error", slog.Any("error", err))
-		if errors.Is(err, ErrInvalidData) {
+		if errors.Is(err, domain.ErrInvalidData) {
 			WithInvalidParam("name", "invalid value")(prob)
 			return api.CreateProfile422ApplicationProblemPlusJSONResponse(*prob), nil
 		}
 		status := 500
-		if errors.Is(err, ErrDuplicateProfile) {
+		if errors.Is(err, domain.ErrDuplicateProfile) {
 			status = 409
 		}
 		return api.CreateProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: status}, nil
@@ -79,10 +81,10 @@ func (p *ProfileAPI) DeleteProfile(ctx context.Context, request api.DeleteProfil
 	if err := p.app.DeleteProfile(ctx, uid); err != nil {
 		prob := ProblemFromDomainError(err)
 		switch {
-		case errors.Is(err, ErrInvalidData):
+		case errors.Is(err, domain.ErrInvalidData):
 			WithInvalidParam("id", "invalid value")(prob)
 			return api.DeleteProfile400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
-		case errors.Is(err, ErrProfileNotFound):
+		case errors.Is(err, domain.ErrProfileNotFound):
 			return api.DeleteProfile404ApplicationProblemPlusJSONResponse(*prob), nil
 		default:
 			return api.DeleteProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
@@ -103,16 +105,16 @@ func (p *ProfileAPI) GetProfileById(ctx context.Context, request api.GetProfileB
 	if err != nil {
 		prob := ProblemFromDomainError(err)
 		switch {
-		case errors.Is(err, ErrInvalidData):
+		case errors.Is(err, domain.ErrInvalidData):
 			WithInvalidParam("id", "invalid value")(prob)
 			return api.GetProfileById400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: api.ProblemResponseApplicationProblemPlusJSONResponse(*prob)}, nil
-		case errors.Is(err, ErrProfileNotFound):
+		case errors.Is(err, domain.ErrProfileNotFound):
 			return api.GetProfileById404ApplicationProblemPlusJSONResponse(*prob), nil
 		default:
 			return api.GetProfileByIddefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
 		}
 	}
-	resp := api.SuccessProfile{Data: mapProfile([]Profile{*prof})[0]}
+	resp := api.SuccessProfile{Data: mapProfile([]domain.Profile{*prof})[0]}
 	return api.GetProfileById200JSONResponse(resp), nil
 }
 
@@ -208,7 +210,7 @@ func (p *ProfileAPI) ListProfiles(ctx context.Context, request api.ListProfilesR
 		if len(profiles) > 0 {
 			last := profiles[len(profiles)-1]
 			// Newest first, so there is no "prev" set for initial page
-			n := p.app.makeCursorFromProfile(last, DESC, 24*time.Hour)
+			n := p.app.MakeCursorFromProfile(last, domain.DESC, 24*time.Hour)
 			nextStr = serde.Ptr(n)
 			// prev remains nil on initial page
 		}
@@ -254,8 +256,8 @@ func (p *ProfileAPI) ListProfiles(ctx context.Context, request api.ListProfilesR
 	if len(profiles) > 0 {
 		first := profiles[0]
 		last := profiles[len(profiles)-1]
-		n := p.app.makeCursorFromProfile(last, DESC, 24*time.Hour)
-		pcur := p.app.makeCursorFromProfile(first, ASC, 24*time.Hour)
+		n := p.app.MakeCursorFromProfile(last, domain.DESC, 24*time.Hour)
+		pcur := p.app.MakeCursorFromProfile(first, domain.ASC, 24*time.Hour)
 		nextStr = serde.Ptr(n)
 		prevStr = serde.Ptr(pcur)
 	}
@@ -334,18 +336,18 @@ func (p *ProfileAPI) ModifyProfile(ctx context.Context, request api.ModifyProfil
 	if err != nil {
 		prob := ProblemFromDomainError(err)
 		switch {
-		case errors.Is(err, ErrInvalidData):
+		case errors.Is(err, domain.ErrInvalidData):
 			WithInvalidParam("body", "no valid fields to update")(prob)
 			return api.ModifyProfile422ApplicationProblemPlusJSONResponse(*prob), nil
-		case errors.Is(err, ErrDuplicateProfile):
+		case errors.Is(err, domain.ErrDuplicateProfile):
 			return api.ModifyProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 409}, nil
-		case errors.Is(err, ErrProfileNotFound):
+		case errors.Is(err, domain.ErrProfileNotFound):
 			return api.ModifyProfile404ApplicationProblemPlusJSONResponse(*prob), nil
 		default:
 			return api.ModifyProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
 		}
 	}
-	resp := api.SuccessProfile{Data: mapProfile([]Profile{*updated})[0]}
+	resp := api.SuccessProfile{Data: mapProfile([]domain.Profile{*updated})[0]}
 	return api.ModifyProfile200JSONResponse(resp), nil
 }
 
@@ -366,28 +368,28 @@ func (p *ProfileAPI) UpdateProfile(ctx context.Context, request api.UpdateProfil
 	if err != nil {
 		prob := ProblemFromDomainError(err)
 		switch {
-		case errors.Is(err, ErrInvalidData):
+		case errors.Is(err, domain.ErrInvalidData):
 			WithInvalidParam("name", "invalid value")(prob)
 			return api.UpdateProfile422ApplicationProblemPlusJSONResponse(*prob), nil
-		case errors.Is(err, ErrDuplicateProfile):
+		case errors.Is(err, domain.ErrDuplicateProfile):
 			return api.UpdateProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 409}, nil
-		case errors.Is(err, ErrProfileNotFound):
+		case errors.Is(err, domain.ErrProfileNotFound):
 			return api.UpdateProfile404ApplicationProblemPlusJSONResponse(*prob), nil
 		default:
 			return api.UpdateProfiledefaultApplicationProblemPlusJSONResponse{Body: *prob, StatusCode: 500}, nil
 		}
 	}
-	resp := api.SuccessProfile{Data: mapProfile([]Profile{*updated})[0]}
+	resp := api.SuccessProfile{Data: mapProfile([]domain.Profile{*updated})[0]}
 	return api.UpdateProfile200JSONResponse(resp), nil
 }
 
-func NewProfileService(pool db.ConnectionPool, persistence ProfilePersistence, signer CursorSigner) *ProfileAPI {
+func NewProfileService(pool db.ConnectionPool, persistence domain.ProfilePersistence, signer domain.CursorSigner) *ProfileAPI {
 	return &ProfileAPI{
-		app: newApp(pool, persistence, signer),
+		app: domain.NewApp(pool, persistence, signer),
 	}
 }
 
-func mapProfile(profiles []Profile) []api.Profile {
+func mapProfile(profiles []domain.Profile) []api.Profile {
 	result := make([]api.Profile, 0)
 	for _, p := range profiles {
 		var agePtr *string

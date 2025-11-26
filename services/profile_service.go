@@ -15,37 +15,38 @@
 package services
 
 import (
-	profileapi "app/api/profileapi/stdlib"
-	profile_service "app/core/profile"
 	"net/http"
+
+	profile_api "app/api/profileapi/stdlib"
+	profile_http "app/core/profile/adapters/http"
 )
 
 // ProfileAPIService encapsulates the registration logic for the Profile API.
 type ProfileAPIService struct {
-	handler profileapi.StrictServerInterface
+	handler profile_api.StrictServerInterface
 }
 
-func NewProfileAPIService(h profileapi.StrictServerInterface) *ProfileAPIService {
+func NewProfileAPIService(h profile_api.StrictServerInterface) *ProfileAPIService {
 	return &ProfileAPIService{handler: h}
 }
 
 // Register configures the strict handler and mounts the profile API routes.
 func (s *ProfileAPIService) Register(mux *http.ServeMux) {
-	strict := profileapi.NewStrictHandlerWithOptions(
+	strict := profile_api.NewStrictHandlerWithOptions(
 		s.handler,
-		[]profileapi.StrictMiddlewareFunc{},
-		profileapi.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  profile_service.ProblemDetailsRequestErrorHandler,
-			ResponseErrorHandlerFunc: profile_service.ProblemDetailsResponseErrorHandler,
+		[]profile_api.StrictMiddlewareFunc{},
+		profile_api.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  profile_http.ProblemDetailsRequestErrorHandler,
+			ResponseErrorHandlerFunc: profile_http.ProblemDetailsResponseErrorHandler,
 		},
 	)
 
-	profileapi.HandlerWithOptions(
+	profile_api.HandlerWithOptions(
 		strict,
-		profileapi.StdHTTPServerOptions{
+		profile_api.StdHTTPServerOptions{
 			BaseRouter:       mux,
-			Middlewares:      []profileapi.MiddlewareFunc{},
-			ErrorHandlerFunc: profile_service.ProblemDetailsRequestErrorHandler,
+			Middlewares:      []profile_api.MiddlewareFunc{},
+			ErrorHandlerFunc: profile_http.ProblemDetailsRequestErrorHandler,
 		},
 	)
 }
@@ -53,6 +54,6 @@ func (s *ProfileAPIService) Register(mux *http.ServeMux) {
 // Middlewares returns global middlewares required by the Profile API, such as validation.
 func (s *ProfileAPIService) Middlewares() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
-		profile_service.ProfileHTTPValidationMiddleware(),
+		profile_http.ProfileHTTPValidationMiddleware(),
 	}
 }

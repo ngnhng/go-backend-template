@@ -1,4 +1,4 @@
-package profile_service
+package domain
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func (app *Application) CreateProfile(ctx context.Context, username, email strin
 		slog.DebugContext(ctx, "created profile", slog.Any("profile", fmt.Sprintf("%+v", created)))
 		return created, nil
 	}
-	if errors.Is(err, ErrDuplicateEntry) {
+	if errors.Is(err, ErrDuplicateProfile) {
 		slog.ErrorContext(ctx, "duplicate entry", slog.Any("name", username))
 		return nil, ErrDuplicateProfile
 	}

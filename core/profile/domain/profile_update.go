@@ -1,4 +1,4 @@
-package profile_service
+package domain
 
 import (
 	"context"
@@ -30,7 +30,7 @@ func (app *Application) UpdateProfile(ctx context.Context, id uuid.UUID, name st
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProfileNotFound
 	}
-	if errors.Is(err, ErrDuplicateEntry) {
+	if errors.Is(err, ErrDuplicateProfile) {
 		return nil, ErrDuplicateProfile
 	}
 	if errors.Is(err, ErrInvalidData) {
@@ -63,7 +63,7 @@ func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, nameSet
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProfileNotFound
 	}
-	if errors.Is(err, ErrDuplicateEntry) {
+	if errors.Is(err, ErrDuplicateProfile) {
 		return nil, ErrDuplicateProfile
 	}
 	if errors.Is(err, ErrInvalidData) {

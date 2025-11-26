@@ -1,9 +1,10 @@
-package profile_service
+package domain
 
 import (
-	"app/db"
 	"context"
 	"time"
+
+	"app/db"
 
 	"github.com/gofrs/uuid/v5"
 )

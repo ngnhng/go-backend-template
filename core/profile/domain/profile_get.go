@@ -1,4 +1,4 @@
-package profile_service
+package domain
 
 import (
 	"context"

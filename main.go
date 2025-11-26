@@ -19,10 +19,6 @@
 package main
 
 import (
-	"app/db/postgres"
-	"app/server"
-	"app/services"
-	"app/telemetry"
 	"context"
 	"log/slog"
 	"os"
@@ -30,10 +26,17 @@ import (
 	"syscall"
 	"time"
 
+	"app/db/postgres"
+	"app/server"
+	"app/services"
+	"app/telemetry"
+
 	"github.com/caarlos0/env/v11"
 
-	profile_service "app/core/profile"
-	hmacsign "app/hmac"
+	"app/core/profile/adapters/persistence"
+
+	profile_http "app/core/profile/adapters/http"
+	hmac_sign "app/hmac"
 )
 
 func main() {
@@ -61,18 +64,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	hmacConfig, err := env.ParseAs[hmacsign.HMACConfig]()
+	hmacConfig, err := env.ParseAs[hmac_sign.HMACConfig]()
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac key not configured")
 		os.Exit(1)
 	}
-	signer, err := hmacsign.NewHMACSigner([]byte(hmacConfig.Secret))
+	signer, err := hmac_sign.NewHMACSigner([]byte(hmacConfig.Secret))
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac signer setup error", slog.Any("error", err))
 		os.Exit(1)
 	}
 
-	postgresProfilePersistence := &profile_service.PostgresProfilePersistence{
+	postgresProfilePersistence := &persistence.PostgresProfilePersistence{
 		TableName: "profiles",
 	}
 
@@ -90,7 +93,7 @@ func main() {
 
 	// --- application layer ---
 
-	profileApi := profile_service.NewProfileService(
+	profileApi := profile_http.NewProfileService(
 		postgresConnectionPool, postgresProfilePersistence, signer)
 
 	// Compose enabled services
@@ -100,7 +103,7 @@ func main() {
 		"0.0.0.0", 8080,
 		server.WithWriteTimeout(10*time.Second),
 		server.WithServices(profileSvc),
-		server.WithGlobalMiddlewares(profile_service.RecoverHTTPMiddleware()),
+		server.WithGlobalMiddlewares(profile_http.RecoverHTTPMiddleware()),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "init server error", slog.Any("error", err))

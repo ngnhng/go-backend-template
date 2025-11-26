@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package profile_service
+package persistence
 
 import (
-	"app/db"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
+
+	"app/core/profile/domain"
+	"app/db"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -30,24 +33,31 @@ import (
 
 // On pgx error handling:
 // https://github.com/jackc/pgx/wiki/Error-Handling
-var (
-	ErrDuplicateEntry = errors.New("item with this identifier already exists")
-)
+var ()
 
-var _ ProfilePersistence = (*PostgresProfilePersistence)(nil)
+var _ domain.ProfilePersistence = (*PostgresProfilePersistence)(nil)
 
 type (
 	PostgresProfilePersistence struct {
 		TableName string
 	}
+
+	// ProfileRow is the persistence entity shape used by storage adapters.
+	ProfileRow struct {
+		ID        uuid.UUID     `db:"id"`
+		Name      string        `db:"username"`
+		Email     string        `db:"email"`
+		Age       sql.NullInt32 `db:"age"`
+		CreatedAt time.Time     `db:"created_at"`
+	}
 )
 
-func toProfile(row ProfileRow) Profile {
-	return Profile(row)
+func toProfile(row ProfileRow) domain.Profile {
+	return domain.Profile(row)
 }
 
-func toProfiles(rows []ProfileRow) []Profile {
-	out := make([]Profile, 0, len(rows))
+func toProfiles(rows []ProfileRow) []domain.Profile {
+	out := make([]domain.Profile, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, toProfile(r))
 	}
@@ -55,14 +65,14 @@ func toProfiles(rows []ProfileRow) []Profile {
 }
 
 // GetProfilesByCursor implements ProfilePersistence (pivot-based).
-func (p *PostgresProfilePersistence) GetProfilesByCursor(ctx context.Context, q db.Querier, pivotCreatedAt time.Time, pivotID uuid.UUID, dir CursorDirection, limit int) ([]Profile, error) {
+func (p *PostgresProfilePersistence) GetProfilesByCursor(ctx context.Context, q db.Querier, pivotCreatedAt time.Time, pivotID uuid.UUID, dir domain.CursorDirection, limit int) ([]domain.Profile, error) {
 	// Comparator direction relative to fixed presentation ORDER BY created_at DESC, id DESC
 	comparator := "<"
-	if dir == ASC {
+	if dir == domain.ASC {
 		comparator = ">"
 	}
 	if limit <= 0 {
-		return nil, ErrInvalidData
+		return nil, domain.ErrInvalidData
 	}
 
 	listQuery := fmt.Sprintf(`
@@ -83,9 +93,9 @@ func (p *PostgresProfilePersistence) GetProfilesByCursor(ctx context.Context, q 
 }
 
 // GetProfilesFirstPage returns the first page in cursor presentation order.
-func (p *PostgresProfilePersistence) GetProfilesFirstPage(ctx context.Context, q db.Querier, limit int) ([]Profile, error) {
+func (p *PostgresProfilePersistence) GetProfilesFirstPage(ctx context.Context, q db.Querier, limit int) ([]domain.Profile, error) {
 	if limit <= 0 {
-		return nil, ErrInvalidData
+		return nil, domain.ErrInvalidData
 	}
 	listQuery := fmt.Sprintf(`
         SELECT id, username, email, age, created_at
@@ -104,7 +114,7 @@ func (p *PostgresProfilePersistence) GetProfilesFirstPage(ctx context.Context, q
 }
 
 // GetProfilesByOffset implements ProfilePersistence.
-func (p *PostgresProfilePersistence) GetProfilesByOffset(ctx context.Context, q db.Querier, limit int, offset int) ([]Profile, int, error) {
+func (p *PostgresProfilePersistence) GetProfilesByOffset(ctx context.Context, q db.Querier, limit int, offset int) ([]domain.Profile, int, error) {
 	listQuery := fmt.Sprintf(`
         SELECT id, username, email, age, created_at
         FROM %s
@@ -129,7 +139,7 @@ func (p *PostgresProfilePersistence) GetProfilesByOffset(ctx context.Context, q 
 	return toProfiles(rows), count, nil
 }
 
-func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Querier, username, email string) (*Profile, error) {
+func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Querier, username, email string) (*domain.Profile, error) {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (username, email)
 		VALUES ($1, $2)
@@ -143,7 +153,7 @@ func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Que
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			slog.DebugContext(ctx, "duplicate profile", slog.Any("error", pgErr))
-			return nil, ErrDuplicateEntry
+			return nil, domain.ErrDuplicateProfile
 		}
 		return nil, fmt.Errorf("unexpected error creating profile: %w", err)
 	}
@@ -154,7 +164,7 @@ func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Que
 }
 
 // GetProfileByID fetches a single non-deleted profile.
-func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Querier, id uuid.UUID) (*Profile, error) {
+func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Querier, id uuid.UUID) (*domain.Profile, error) {
 	query := fmt.Sprintf(`
         SELECT id, username, email, age, created_at
         FROM %s
@@ -169,9 +179,9 @@ func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Qu
 }
 
 // UpdateProfile updates username and optionally email, returning the updated entity.
-func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Querier, id uuid.UUID, name string, email *string) (*Profile, error) {
+func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Querier, id uuid.UUID, name string, email *string) (*domain.Profile, error) {
 	if len(name) == 0 {
-		return nil, ErrInvalidData
+		return nil, domain.ErrInvalidData
 	}
 	var (
 		query string
@@ -198,7 +208,7 @@ func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Que
 	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, ErrDuplicateEntry
+			return nil, domain.ErrDuplicateProfile
 		}
 		return nil, err
 	}
@@ -221,9 +231,9 @@ func (p *PostgresProfilePersistence) DeleteProfile(ctx context.Context, q db.Que
 }
 
 // ModifyProfile performs partial updates based on provided fields.
-func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Querier, id uuid.UUID, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*Profile, error) {
+func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Querier, id uuid.UUID, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*domain.Profile, error) {
 	if !nameSet && !ageSet && !emailSet {
-		return nil, ErrInvalidData
+		return nil, domain.ErrInvalidData
 	}
 	sets := []string{}
 	args := []any{id}
@@ -262,7 +272,7 @@ func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Que
 	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, ErrDuplicateEntry
+			return nil, domain.ErrDuplicateProfile
 		}
 		return nil, err
 	}

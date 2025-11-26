@@ -41,19 +41,55 @@ linters:
   settings:
     depguard:
       rules:
-        profile-service:
-          list-mode: lax
+        # Domain Layer - Pure business logic (works for ALL services: profile, user, payment, etc.)
+        domain-layer:
+          list-mode: strict
           files:
-            - "profile-service/**"
+            - "core/*/domain/**/*.go"
           allow:
             - $gostd
+            - "app/db$"                # Only db interface package
+            - "app/core/*/domain"      # Domains can import other service domains
+          deny:
+            - pkg: "app/api"
+              desc: "domain layer must not depend on transport models"
+            - pkg: "app/server"
+              desc: "domain layer must not depend on HTTP wiring"
+            - pkg: "app/db/postgres"
+              desc: "domain layer must use db interfaces, not implementations"
+            - pkg: "app/core/*/adapters"
+              desc: "domain layer must not depend on adapters"
+
+        # HTTP Adapters - ALL HTTP transport adapters (profile, user, payment, etc.)
+        http-adapters:
+          list-mode: strict
+          files:
+            - "core/*/adapters/http/**/*.go"
+          allow:
+            - $gostd
+            - "app/api"                # Can use generated API models
+            - "app/core/*/domain"      # Can call domain layer
+            - "app/db$"                # Can use db interfaces for injection
           deny:
             - pkg: "app/server"
-              desc: "application layer must not depend on HTTP wiring"
-            - pkg: "app/api"
-              desc: "application layer must not depend on transport models"
+              desc: "HTTP adapters should not directly import server package"
             - pkg: "app/db/postgres"
-              desc: "application layer should depend on db ports, not adapter impls"
+              desc: "should depend on db interfaces, not implementations"
+
+        # Persistence Adapters - ALL database adapters (profile, user, payment, etc.)
+        persistence-adapters:
+          list-mode: strict
+          files:
+            - "core/*/adapters/persistence/**/*.go"
+          allow:
+            - $gostd
+            - "app/db"                 # Can use db package and implementations
+            - "app/core/*/domain"      # Can use domain types
+          deny:
+            - pkg: "app/api"
+              desc: "persistence layer must not depend on transport models"
+            - pkg: "app/server"
+              desc: "persistence layer must not depend on HTTP wiring"
 
 issues:
   max-issues-per-linter: 0

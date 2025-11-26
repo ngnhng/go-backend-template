@@ -15,8 +15,9 @@
 package services
 
 import (
-	paymentapi "app/api/paymentapi/stdlib"
 	"net/http"
+
+	paymentapi "app/api/paymentapi/stdlib"
 )
 
 // PaymentAPIService encapsulates registration for the Payment API.

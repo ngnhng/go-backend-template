@@ -1,4 +1,4 @@
-package profile_service
+package domain
 
 // CursorSigner is the outbound port for signing and verifying cursor tokens.
 type CursorSigner interface {

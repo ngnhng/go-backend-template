@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package profile_service
+package http
 
 import (
-	api "app/api/profileapi/stdlib"
-	"app/api/serde"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	api "app/api/profileapi/stdlib"
+	"app/api/serde"
+	"app/core/profile/domain"
 )
 
 type (
@@ -116,11 +118,11 @@ func InternalProblem(detail string) *ErrorResponse {
 // ProblemFromDomainError maps domain/service-layer sentinel errors to RFC7807 problems.
 func ProblemFromDomainError(err error) *ErrorResponse {
 	switch {
-	case errors.Is(err, ErrDuplicateProfile):
+	case errors.Is(err, domain.ErrDuplicateProfile):
 		return ConflictProblem("profile with this name already exists")
-	case errors.Is(err, ErrInvalidData):
+	case errors.Is(err, domain.ErrInvalidData):
 		return ValidationProblem("validation failed")
-	case errors.Is(err, ErrProfileNotFound):
+	case errors.Is(err, domain.ErrProfileNotFound):
 		return NewErrorResponse(WithTitle("Not Found"), WithStatus(http.StatusNotFound), WithDetail("profile not found"))
 	default:
 		return InternalProblem("server error")

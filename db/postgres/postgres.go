@@ -15,7 +15,6 @@
 package postgres
 
 import (
-	"app/db"
 	"context"
 	"database/sql"
 	"fmt"
@@ -24,6 +23,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"app/db"
 
 	_ "github.com/caarlos0/env/v11" // what we should use to parse env
 
