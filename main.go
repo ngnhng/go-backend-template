@@ -32,8 +32,8 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
+	profile_service "app/core/profile-service"
 	hmacsign "app/hmac"
-	profile_service "app/profile-service"
 )
 
 func main() {
