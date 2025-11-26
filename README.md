@@ -79,7 +79,7 @@ OpenTelemetry is an observability framework that standardizes the telemetry coll
 
 ### Logs, metrics & traces
 
-The three pillars of observability are traces, metrics and logs
+The three pillars of observability are traces, metrics and logs.
 
 ### Go libraries & tooling
 
@@ -89,8 +89,6 @@ The three pillars of observability are traces, metrics and logs
   - Manual
   - Auto
   - Detect
-
-Here is the analysis of your "Hybrid" Observability stack based on the provided `docker-compose.yml`.
 
 ### Tech stack in this repository
 
