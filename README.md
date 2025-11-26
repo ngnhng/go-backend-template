@@ -73,11 +73,41 @@ Key adapters and boundaries
 
 ## Observability
 
-Monitoring and debugging application in a distributed context is a hard problem since there are too many moving parts in just a single API call.
+Monitoring and debugging application in a distributed system is a hard problem since there are often too many moving parts in just a single business workflow. Capturing enough data to answer questions on application performance and operational issues meaningful proves to be a challenge.
+
+OpenTelemetry is an observability framework that standardizes the telemetry collection and integration with a multitude of tools that are Otel compatible.
 
 ### Logs, metrics & traces
 
+The three pillars of observability are traces, metrics and logs
+
 ### Go libraries & tooling
+
+- Auto-instrumentation
+
+- Modes:
+  - Manual
+  - Auto
+  - Detect
+
+Here is the analysis of your "Hybrid" Observability stack based on the provided `docker-compose.yml`.
+
+### Tech stack in this repository
+
+This stack represents a **"Pure Victoria" High-Performance Architecture**. It minimizes resource usage (RAM/CPU) by using single-binary tools and eBPF instead of heavy agents.
+
+| Data Type           | Tool / Service        | Component Name     | Why is it in this stack?                                                                                                                        |
+| :------------------ | :-------------------- | :----------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Database**        | **PostgreSQL**        | `postgres`         | The persistent data store. Includes replication to test production-like read/write scenarios.                                                   |
+| **Instrumentation** | **OTel Auto-Inst.**   | `otel-agent`       | **Zero-Code Tracing.** Uses eBPF to attach to the Go process at runtime, generating traces without you writing manual OTel code.                |
+| **Metrics**         | **Coroot Node Agent** | `node-agent`       | **Infrastructure Spy.** Replaces `node_exporter`/`cadvisor`. Uses eBPF to see container CPU/Mem and—crucially—network topology map.             |
+| **Metrics**         | **VictoriaMetrics**   | `victoria-metrics` | **Metric Storage.** Replaces Prometheus. Uses ~10x less RAM and handles high cardinality better for local dev.                                  |
+| **Metrics**         | **VMAgent**           | `vmagent`          | **Scraper.** The "glue" that scrapes `node-agent` and pushes data to VictoriaMetrics.                                                           |
+| **Metrics**         | **VMAlert**           | `vmalert`          | **Logic Engine.** Computes derived health metrics (e.g., "SLO violation") required for the KirillYu dashboards.                                 |
+| **Logs**            | **Fluent Bit**        | `fluent-bit`       | **Collector.** Lightweight log router. Captures Docker container logs and converts them to JSON for VictoriaLogs.                               |
+| **Logs**            | **VictoriaLogs**      | `victoria-logs`    | **Log Storage.** Replaces Loki/Elasticsearch. Extremely low RAM usage for high-volume log storage.                                              |
+| **Traces**          | **VictoriaTraces**    | `victoria-traces`  | **Trace Storage.** Replaces Tempo/Jaeger. Integrates natively with the Victoria ecosystem and shares the same design philosophy (simple, fast). |
+| **Visualization**   | **Grafana**           | `grafana`          | **The UI.** Connects to VM (Metrics), VLogs (Logs), and VTraces (Traces via Jaeger API) to visualize everything in one place.                   |
 
 ### AWS X-Ray ID
 

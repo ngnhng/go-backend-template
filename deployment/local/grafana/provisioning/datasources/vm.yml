@@ -1,27 +1,50 @@
 apiVersion: 1
 
 datasources:
-  - name: Mimir
-    uid: mimir
+  # 1. TRACES (Define this FIRST so others can link to it)
+  # ----------------------------------------------------
+  - name: VictoriaTraces
+    type: jaeger
+    access: proxy
+    url: http://victoria-traces:8429
+    uid: victoria-traces
+    basicAuth: false
+    isDefault: false
+    editable: true
+    jsonData:
+      nodeGraph:
+        enabled: true
+      # Link Traces -> Logs
+      logs:
+        datasourceUid: victoria-logs
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+
+  # 2. LOGS (VictoriaLogs)
+  # ----------------------
+  - name: VictoriaLogs
+    type: victoriametrics-logs-datasource
+    access: proxy
+    url: http://victoria-logs:9428
+    uid: victoria-logs
+    jsonData:
+      # Link Logs -> Traces
+      derivedFields:
+        - datasourceUid: victoria-traces
+          matcherRegex: "trace_id=(\\w+)"
+          name: TraceID
+          url: "$${__value.raw}"
+
+  # 3. METRICS (VictoriaMetrics)
+  # ----------------------------
+  - name: VictoriaMetrics
     type: prometheus
     access: proxy
-    url: http://mimir:9009/prometheus
+    url: http://victoria-metrics:8428
     isDefault: true
-    editable: false
+    uid: victoria-metrics
     jsonData:
-      httpMethod: POST
+      # Link Metrics -> Traces
       exemplarTraceIdDestinations:
-        - name: Tempo
-          datasourceUid: tempo
-  - name: Loki
-    uid: loki
-    type: loki
-    access: proxy
-    url: http://loki:3100
-    editable: false
-  - name: Tempo
-    uid: tempo
-    type: tempo
-    access: proxy
-    url: http://tempo:3200
-    editable: false
+        - datasourceUid: victoria-traces
+          name: trace_id

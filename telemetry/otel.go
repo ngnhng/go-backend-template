@@ -193,11 +193,11 @@ func buildHTTPTraceExporter(ctx context.Context, cfg Config) (sdktrace.SpanExpor
 		ep := cfg.OTLPEndpoint
 
 		switch {
-		// Full URL: e.g. "http://coroot:8080/v1/traces"
+		// Full URL: e.g. "http://victoria-metrics:8080/v1/traces"
 		case strings.HasPrefix(ep, "http://") || strings.HasPrefix(ep, "https://"):
 			opts = append(opts, otlptracehttp.WithEndpointURL(ep))
 
-		// Host:port: e.g. "coroot:8080" or "otel-collector:4318"
+		// Host:port: e.g. "victoria-metrics:8080" or "otel-collector:4318"
 		default:
 			scheme := "https"
 			if cfg.Insecure {

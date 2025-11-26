@@ -14,26 +14,32 @@
 #
 volumes:
   grafana_data: {}
+  grafana_plugins: {}
   pg18-primary-data: {}
   pg18-replica-data: {}
   node_agent_data: {}
   tempo_data: {}
   vm_data: {}
+  vlogs_data: {}
+  vt_data: {}
 
 services:
   profile-api:
     build:
       context: .
       dockerfile: ./deployment/local/profile-api/Dockerfile
-      target: app-local
     restart: "no"
     shm_size: 256mb
+    logging:
+      driver: fluentd
     environment:
       OTEL_SERVICE_NAME: "profile-api"
+      OTEL_GO_AUTO_TARGET_EXE: "profile-api"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,service.version=dev"
+      OTEL_METRICS_EXPORTER: "otlp"
       OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector:4317"
-      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://victoria-traces:4317"
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://victoria-metrics:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       POSTGRES_PRIMARY_HOST: "postgres-primary"
       POSTGRES_PRIMARY_PORT: "5432"
@@ -49,6 +55,22 @@ services:
     profiles:
       - profile-api
       - all
+
+  # The Auto-Instrumentation Agent (Sidecar)
+  otel-agent:
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:latest
+    privileged: true # Required for eBPF
+    pid: "service:profile-api" # Share PID namespace with the app to see its process
+    environment:
+      # Path to the BINARY inside the 'app' container, not the source code
+      - OTEL_GO_AUTO_TARGET_EXE=/profile-api
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://victoria-traces:4317
+      - OTEL_SERVICE_NAME=profile-api
+    depends_on:
+      - victoria-metrics
+    profiles:
+      - all
+
   # --- Application dependencies ---
   postgres-primary:
     image: postgres:18-alpine
@@ -119,30 +141,25 @@ services:
       - all
 
   # --- Observability ---
-  tempo:
-    image: grafana/tempo
-    restart: unless-stopped
-    command:
-      - -config.file=/etc/tempo/config.yaml
-    volumes:
-      - ./deployment/local/tempo/config.yaml:/etc/tempo/config.yaml:ro
-      - tempo_data:/var/tempo
-    ports:
-      - "3200:3200"
-    profiles:
-      - observability
-      - all
-
   grafana:
     image: grafana/grafana
     restart: no
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "victoriametrics-logs-datasource,grafana-metricsdrilldown-app,grafana-lokiexplore-app"
+      GF_PLUGINS_PREINSTALL_SYNC: "victoriametrics-logs-datasource"
+      GF_LOG_LEVEL: info
     volumes:
       - grafana_data:/var/lib/grafana
+      - grafana_plugins:/var/lib/grafana/plugins
+      - ./deployment/local/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - ./deployment/local/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deployment/local/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - victoria-traces
+      - victoria-logs
+      - victoria-metrics
     ports:
       - "3000:3000"
     profiles:
@@ -177,6 +194,9 @@ services:
       - "8428:8428"
     volumes:
       - vm_data:/vm-data
+    profiles:
+      - observability
+      - all
 
   vmagent:
     image: victoriametrics/vmagent
@@ -188,6 +208,9 @@ services:
     depends_on:
       - victoria-metrics
       - node-agent
+    profiles:
+      - observability
+      - all
 
   vmalert:
     image: victoriametrics/vmalert
@@ -200,3 +223,50 @@ services:
       - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
     depends_on:
       - victoria-metrics
+    profiles:
+      - observability
+      - all
+
+  victoria-logs:
+    image: victoriametrics/victoria-logs:latest
+    command:
+      - "-storageDataPath=/vlogs-data"
+      - "-retentionPeriod=1d"
+    ports:
+      - "9428:9428"
+    volumes:
+      - vlogs_data:/vlogs-data
+    profiles:
+      - observability
+      - all
+
+  victoria-traces:
+    image: victoriametrics/victoria-traces:latest
+    command:
+      - "-httpListenAddr=:8429"
+      - "-otlpGRPCListenAddr=:4317"
+      - "-otlpGRPC.tls=false"
+      - "-storageDataPath=/vt-data"
+      - "-retentionPeriod=1d"
+    ports:
+      - "8429:8429" # UI and Jaeger Query API
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    volumes:
+      - vt_data:/vt-data
+    profiles:
+      - observability
+      - all
+
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    volumes:
+      - ./deployment/local/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+    ports:
+      - "24224:24224" # Listens for Docker logs
+      - "24224:24224/udp"
+    depends_on:
+      - victoria-logs
+    profiles:
+      - observability
+      - all

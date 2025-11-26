@@ -24,6 +24,7 @@ import (
 	profile_service "app/profile-service"
 	"app/server"
 	"app/services"
+	"app/telemetry"
 
 	"context"
 	"log/slog"
@@ -33,18 +34,12 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-
-	autosdk "go.opentelemetry.io/auto/sdk"
-	"go.opentelemetry.io/otel"
 )
 
 func main() {
 	// cancel the context when these signals occur
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, os.Interrupt)
 	defer cancel()
-
-	tp := autosdk.TracerProvider()
-	otel.SetTracerProvider(tp)
 
 	// manual dependency injections, imo there's no need to over-engineer with DI frameworks like Fx or Wire
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -61,7 +56,7 @@ func main() {
 		slog.ErrorContext(ctx, "database error", slog.Any("error", err))
 		os.Exit(1)
 	}
-	if postgresConnectionPool.HealthCheck() == false {
+	if !postgresConnectionPool.HealthCheck() {
 		slog.ErrorContext(ctx, "database health check failed")
 		os.Exit(1)
 	}
@@ -80,6 +75,18 @@ func main() {
 	postgresProfilePersistence := &profile_service.PostgresProfilePersistence{
 		TableName: "profiles",
 	}
+
+	telemetryConfig, err := env.ParseAs[telemetry.Config]()
+	if err != nil {
+		slog.ErrorContext(ctx, "telemetry not properly configured")
+		os.Exit(1)
+	}
+	otelShutdown, err := telemetry.Init(ctx, telemetryConfig)
+	if err != nil {
+		slog.ErrorContext(ctx, "telemetry not properly configured")
+		os.Exit(1)
+	}
+	defer otelShutdown(ctx)
 
 	// --- application layer ---
 

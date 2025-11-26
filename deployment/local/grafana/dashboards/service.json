@@ -1,0 +1,84 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP Requests (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "sum by (method, status) (rate(container_http_requests_total{container_name=\"$service\"}[1m]))",
+          "legendFormat": "{{method}} {{status}}"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Latency (P95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(container_http_request_duration_seconds_bucket{container_name=\"$service\"}[1m])) by (le))",
+          "legendFormat": "P95 Latency"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Postgres Query Latency (P95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(container_postgres_query_duration_seconds_bucket{container_name=\"$service\"}[1m])) by (le))",
+          "legendFormat": "DB P95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "TCP Connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "sum(container_net_connections_active{container_name=\"$service\"})",
+          "legendFormat": "Active Connections"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["coroot", "service"],
+  "templating": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+        "definition": "label_values(container_http_requests_total, container_name)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "service",
+        "query": "label_values(container_http_requests_total, container_name)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-30m", "to": "now" },
+  "title": "Service Signals (eBPF)",
+  "uid": "coroot-service",
+  "version": 1
+}

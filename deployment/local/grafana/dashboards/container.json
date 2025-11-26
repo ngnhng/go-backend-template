@@ -1,0 +1,92 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "CPU Usage (Cores)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{container_name=\"$container\"}[1m]))",
+          "legendFormat": "{{container_name}}"
+        }
+      ]
+    },
+    {
+      "title": "Memory Usage (RSS)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "container_memory_rss{container_name=\"$container\"}",
+          "legendFormat": "{{container_name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Network Traffic (Internal)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "rate(container_net_received_bytes_total{container_name=\"$container\"}[1m])",
+          "legendFormat": "Rx"
+        },
+        {
+          "expr": "rate(container_net_transmitted_bytes_total{container_name=\"$container\"}[1m])",
+          "legendFormat": "Tx"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bps" } }
+    },
+    {
+      "title": "Log Volume (Lines/sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "rate(container_log_messages_total{container_name=\"$container\"}[1m])",
+          "legendFormat": "{{level}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["coroot", "containers"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+        "definition": "label_values(container_cpu_usage_seconds_total, container_name)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "container",
+        "options": [],
+        "query": "label_values(container_cpu_usage_seconds_total, container_name)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Container Stats",
+  "uid": "coroot-containers",
+  "version": 1
+}

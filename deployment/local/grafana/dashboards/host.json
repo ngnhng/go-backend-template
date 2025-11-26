@@ -1,0 +1,77 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Host CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
+          "legendFormat": "CPU Used %"
+        }
+      ]
+    },
+    {
+      "title": "Host Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "100 * (1 - ((node_memory_MemFree_bytes + node_memory_Buffers_bytes + node_memory_Cached_bytes) / node_memory_MemTotal_bytes))",
+          "legendFormat": "RAM Used %"
+        }
+      ]
+    },
+    {
+      "title": "Disk I/O",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "rate(node_disk_read_bytes_total[1m])",
+          "legendFormat": "Read"
+        },
+        {
+          "expr": "rate(node_disk_written_bytes_total[1m])",
+          "legendFormat": "Write"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Network Traffic",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total[1m])",
+          "legendFormat": "Received"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total[1m])",
+          "legendFormat": "Transmitted"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bps" } }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["coroot", "infra"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Host Stats (Node Agent)",
+  "uid": "coroot-host",
+  "version": 1
+}
