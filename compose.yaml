@@ -69,6 +69,7 @@ services:
     depends_on:
       - victoria-metrics
     profiles:
+      - sidecar
       - all
 
   # --- Application dependencies ---

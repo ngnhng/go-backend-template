@@ -115,16 +115,16 @@ func InternalProblem(detail string) *ErrorResponse {
 
 // ProblemFromDomainError maps domain/service-layer sentinel errors to RFC7807 problems.
 func ProblemFromDomainError(err error) *ErrorResponse {
-    switch {
-    case errors.Is(err, ErrDuplicateProfile):
-        return ConflictProblem("profile with this name already exists")
-    case errors.Is(err, ErrInvalidData):
-        return ValidationProblem("validation failed")
-    case errors.Is(err, ErrProfileNotFound):
-        return NewErrorResponse(WithTitle("Not Found"), WithStatus(http.StatusNotFound), WithDetail("profile not found"))
-    default:
-        return InternalProblem("server error")
-    }
+	switch {
+	case errors.Is(err, ErrDuplicateProfile):
+		return ConflictProblem("profile with this name already exists")
+	case errors.Is(err, ErrInvalidData):
+		return ValidationProblem("validation failed")
+	case errors.Is(err, ErrProfileNotFound):
+		return NewErrorResponse(WithTitle("Not Found"), WithStatus(http.StatusNotFound), WithDetail("profile not found"))
+	default:
+		return InternalProblem("server error")
+	}
 }
 
 // ProblemDetailsResponseErrorHandler centralizes unexpected handler errors

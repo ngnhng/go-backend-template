@@ -15,10 +15,9 @@
 package server
 
 import (
-	"log/slog"
-
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"

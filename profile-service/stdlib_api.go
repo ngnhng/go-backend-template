@@ -15,7 +15,6 @@
 package profile_service
 
 import (
-	api "app/api/profileapi/stdlib"
 	"app/api/serde"
 	"app/db"
 	"context"
@@ -25,15 +24,19 @@ import (
 	"strconv"
 	"time"
 
+	api "app/api/profileapi/stdlib"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime/types"
 )
 
+// Controller implementation of the oapi-codegen generated HTTP API handlers
 type ProfileAPI struct {
-	app *ProfileManager
+	app *Application
 }
 
+// Strict server interface reduces the boilerplate marshaling of request/response data thus enforcing better type-safety
 var _ api.StrictServerInterface = (*ProfileAPI)(nil)
 
 // CreateProfile implements profile_api.StrictServerInterface.
@@ -56,7 +59,8 @@ func (p *ProfileAPI) CreateProfile(ctx context.Context, request api.CreateProfil
 	resp := api.SuccessProfile{
 		Data: api.Profile{
 			Id:   [16]byte(profile.ID.Bytes()),
-			Name: profile.Name},
+			Name: profile.Name,
+		},
 	}
 	return api.CreateProfile201JSONResponse{
 		Body:    resp,
@@ -127,7 +131,7 @@ func (p *ProfileAPI) ListProfiles(ctx context.Context, request api.ListProfilesR
 	hasAfter := request.Params.After != nil
 	hasBefore := request.Params.Before != nil
 	limitProvided := request.Params.Limit != nil
-	cursorComplete := limitProvided && !(hasAfter && hasBefore)
+	cursorComplete := limitProvided && (!hasAfter || !hasBefore)
 
 	slog.DebugContext(ctx,
 		"pagination params",
@@ -265,7 +269,6 @@ func (p *ProfileAPI) ListProfiles(ctx context.Context, request api.ListProfilesR
 		Body:    api.SuccessProfileList{Data: mapProfile(profiles), Meta: meta},
 		Headers: api.ListProfiles200ResponseHeaders{Link: ""},
 	}, nil
-
 }
 
 // ModifyProfile implements profile_api.StrictServerInterface.

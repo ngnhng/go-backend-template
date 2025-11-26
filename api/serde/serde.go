@@ -47,5 +47,4 @@ func ToResponseUUIDv7(idStr string) (*[16]byte, error) {
 	}
 
 	return (*[16]byte)(uid.Bytes()), nil
-
 }

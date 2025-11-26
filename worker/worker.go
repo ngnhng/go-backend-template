@@ -25,7 +25,7 @@ type Worker[Job any] func(context.Context, Job)
 //
 // The function will block until all the work are done (no more jobs e.g. channel closed)
 //
-// # The caller must ensure that jobs channel eventualy gets closed or the context gets cancelled.
+// The caller must ensure that jobs channel eventually gets closed or the context gets cancelled.
 //
 // Use a goroutine worker pool when:
 //

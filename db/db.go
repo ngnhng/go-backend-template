@@ -26,13 +26,14 @@ type (
 	// Querier is an interface for database queries
 	Querier interface {
 		// Use sqlx.ExtContext so both *sqlx.DB and *sqlx.Tx conform
+		// TODO: Prepare and reuse statements
 		sqlx.ExtContext
 	}
 
 	// OLTP SQL compliant database connection pool
 	ConnectionPool interface {
 		HealthManager
-		ConnectionMananger
+		ConnectionManager
 		MigrationManager
 		TxManager
 	}
@@ -43,8 +44,8 @@ type (
 		HealthCheck() bool
 	}
 
-	// ConnectionMananger tries to apply read-replica pattern whenever possible
-	ConnectionMananger interface {
+	// ConnectionManager tries to apply read-replica pattern whenever possible
+	ConnectionManager interface {
 		// Writer returns a writer (primary) database connection
 		// from the underlying database connection pool
 		//

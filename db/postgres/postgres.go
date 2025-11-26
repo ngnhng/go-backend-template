@@ -102,7 +102,6 @@ func (p *PostgresConnectionPool) MigrateUp() error {
 // Without any profiling/edge cases to justify implementing the more complex
 // choices, here we first use a simpler approach first
 func (p *PostgresConnectionPool) Reader() *sqlx.DB {
-
 	if len(p.readers) == 0 {
 		return p.Writer()
 	}

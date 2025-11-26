@@ -34,13 +34,25 @@ var (
 	ErrDuplicateEntry = errors.New("item with this identifier already exists")
 )
 
+var _ ProfilePersistence = (*PostgresProfilePersistence)(nil)
+
 type (
 	PostgresProfilePersistence struct {
 		TableName string
 	}
 )
 
-var _ ProfilePersistence = (*PostgresProfilePersistence)(nil)
+func toProfile(row ProfileRow) Profile {
+	return Profile(row)
+}
+
+func toProfiles(rows []ProfileRow) []Profile {
+	out := make([]Profile, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, toProfile(r))
+	}
+	return out
+}
 
 // GetProfilesByCursor implements ProfilePersistence (pivot-based).
 func (p *PostgresProfilePersistence) GetProfilesByCursor(ctx context.Context, q db.Querier, pivotCreatedAt time.Time, pivotID uuid.UUID, dir CursorDirection, limit int) ([]Profile, error) {
@@ -62,12 +74,12 @@ func (p *PostgresProfilePersistence) GetProfilesByCursor(ctx context.Context, q 
         LIMIT $3
     `, p.TableName, comparator)
 
-	var profiles []Profile
-	if err := sqlx.SelectContext(ctx, q, &profiles, listQuery, pivotCreatedAt, pivotID, limit); err != nil {
+	var rows []ProfileRow
+	if err := sqlx.SelectContext(ctx, q, &rows, listQuery, pivotCreatedAt, pivotID, limit); err != nil {
 		slog.ErrorContext(ctx, "query error", slog.Any("error", err))
 		return nil, fmt.Errorf("select profiles by cursor: %w", err)
 	}
-	return profiles, nil
+	return toProfiles(rows), nil
 }
 
 // GetProfilesFirstPage returns the first page in cursor presentation order.
@@ -83,12 +95,12 @@ func (p *PostgresProfilePersistence) GetProfilesFirstPage(ctx context.Context, q
         LIMIT $1
     `, p.TableName)
 
-	var profiles []Profile
-	if err := sqlx.SelectContext(ctx, q, &profiles, listQuery, limit); err != nil {
+	var rows []ProfileRow
+	if err := sqlx.SelectContext(ctx, q, &rows, listQuery, limit); err != nil {
 		slog.ErrorContext(ctx, "query error", slog.Any("error", err))
 		return nil, fmt.Errorf("select profiles first page: %w", err)
 	}
-	return profiles, nil
+	return toProfiles(rows), nil
 }
 
 // GetProfilesByOffset implements ProfilePersistence.
@@ -101,8 +113,8 @@ func (p *PostgresProfilePersistence) GetProfilesByOffset(ctx context.Context, q 
         LIMIT $1 OFFSET $2
     `, p.TableName)
 
-	var profiles []Profile
-	if err := sqlx.SelectContext(ctx, q, &profiles, listQuery, limit, offset); err != nil {
+	var rows []ProfileRow
+	if err := sqlx.SelectContext(ctx, q, &rows, listQuery, limit, offset); err != nil {
 		slog.ErrorContext(ctx, "query error", slog.Any("error", err))
 		return nil, 0, fmt.Errorf("select profiles: %w", err)
 	}
@@ -114,7 +126,7 @@ func (p *PostgresProfilePersistence) GetProfilesByOffset(ctx context.Context, q 
 		return nil, 0, fmt.Errorf("count profiles: %w", err)
 	}
 
-	return profiles, count, nil
+	return toProfiles(rows), count, nil
 }
 
 func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Querier, username, email string) (*Profile, error) {
@@ -124,7 +136,7 @@ func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Que
 		RETURNING id, username, email, age, created_at;
 		`, p.TableName)
 
-	var createdProfile Profile
+	var createdProfile ProfileRow
 	slog.DebugContext(ctx, "debug query", slog.Any("query", query))
 	if err := sqlx.GetContext(ctx, q, &createdProfile, query, username, email); err != nil {
 		slog.DebugContext(ctx, "error persisting profile", slog.Any("error", err))
@@ -137,7 +149,8 @@ func (p *PostgresProfilePersistence) CreateProfile(ctx context.Context, q db.Que
 	}
 
 	slog.DebugContext(ctx, "persisted profile", slog.Any("profile", fmt.Sprintf("%+v", createdProfile)))
-	return &createdProfile, nil
+	prof := toProfile(createdProfile)
+	return &prof, nil
 }
 
 // GetProfileByID fetches a single non-deleted profile.
@@ -147,10 +160,11 @@ func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Qu
         FROM %s
         WHERE id = $1 AND deleted_at IS NULL
     `, p.TableName)
-	var prof Profile
-	if err := sqlx.GetContext(ctx, q, &prof, query, id); err != nil {
+	var profRow ProfileRow
+	if err := sqlx.GetContext(ctx, q, &profRow, query, id); err != nil {
 		return nil, err
 	}
+	prof := toProfile(profRow)
 	return &prof, nil
 }
 
@@ -180,14 +194,15 @@ func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Que
         `, p.TableName)
 		args = []any{id, name}
 	}
-	var prof Profile
-	if err := sqlx.GetContext(ctx, q, &prof, query, args...); err != nil {
+	var profRow ProfileRow
+	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return nil, ErrDuplicateEntry
 		}
 		return nil, err
 	}
+	prof := toProfile(profRow)
 	return &prof, nil
 }
 
@@ -243,13 +258,14 @@ func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Que
         RETURNING id, username, email, age, created_at
     `, p.TableName, strings.Join(sets, ", "))
 
-	var prof Profile
-	if err := sqlx.GetContext(ctx, q, &prof, query, args...); err != nil {
+	var profRow ProfileRow
+	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return nil, ErrDuplicateEntry
 		}
 		return nil, err
 	}
+	prof := toProfile(profRow)
 	return &prof, nil
 }

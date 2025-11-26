@@ -2,3 +2,6 @@
 *.out
 *.test
 vendor/
+.gocache
+.cache
+.gopath

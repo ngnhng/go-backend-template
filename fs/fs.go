@@ -27,5 +27,4 @@ type FS interface {
 	ReadFile(name string) ([]byte, error)
 }
 
-type LocalFS struct {
-}
+type LocalFS struct{}

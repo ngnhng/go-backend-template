@@ -22,7 +22,6 @@ import (
 )
 
 func Test_100_Workload(t *testing.T) {
-
 	jobs := make(chan int)
 	worker := func(ctx context.Context, n int) {
 		sha256.Sum256(fmt.Appendf([]byte{}, "payload %d", n))

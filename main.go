@@ -20,12 +20,9 @@ package main
 
 import (
 	"app/db/postgres"
-	hmacsign "app/hmac"
-	profile_service "app/profile-service"
 	"app/server"
 	"app/services"
 	"app/telemetry"
-
 	"context"
 	"log/slog"
 	"os"
@@ -34,6 +31,9 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+
+	hmacsign "app/hmac"
+	profile_service "app/profile-service"
 )
 
 func main() {

@@ -19,9 +19,8 @@ import "net/http"
 // RegistrableService defines a modular, self-registering HTTP service.
 // Each service encapsulates its own routing and any service-scoped middlewares.
 type RegistrableService interface {
-    // Register mounts the service's routes onto the provided mux.
-    Register(mux *http.ServeMux)
-    // Middlewares returns server-level middlewares required when this service is active.
-    Middlewares() []func(http.Handler) http.Handler
+	// Register mounts the service's routes onto the provided mux.
+	Register(mux *http.ServeMux)
+	// Middlewares returns server-level middlewares required when this service is active.
+	Middlewares() []func(http.Handler) http.Handler
 }
-
