@@ -16,8 +16,8 @@ package middleware
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
-	"path/filepath"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -34,41 +34,52 @@ type SpecLoadErrorHandler func(w http.ResponseWriter, r *http.Request, err error
 // specCache holds cached OpenAPI specs keyed by file path.
 var (
 	specCacheMu sync.RWMutex
-	specCache   = make(map[string]*specCacheEntry)
+	specCache   = make(map[specCacheKey]*specCacheEntry)
 )
+
+type specCacheKey struct {
+	// if you care about multiple FS, you can add an ID here;
+	// if not, path is probably enough.
+	path string
+}
 
 type specCacheEntry struct {
 	doc *openapi3.T
 	err error
 }
 
-// loadSpec loads an OpenAPI spec from the given path, using a cache to avoid reloading.
-func loadSpec(specPath string) (*openapi3.T, error) {
-	// Check cache first
+func loadSpec(fsys fs.FS, specPath string) (*openapi3.T, error) {
+	key := specCacheKey{path: specPath}
+
+	// Check cache
 	specCacheMu.RLock()
-	if entry, ok := specCache[specPath]; ok {
+	if entry, ok := specCache[key]; ok {
 		specCacheMu.RUnlock()
 		return entry.doc, entry.err
 	}
 	specCacheMu.RUnlock()
 
-	// Load spec
 	specCacheMu.Lock()
 	defer specCacheMu.Unlock()
 
-	// Double-check in case another goroutine loaded it
-	if entry, ok := specCache[specPath]; ok {
+	if entry, ok := specCache[key]; ok {
 		return entry.doc, entry.err
 	}
 
-	// Load from file
-	path := filepath.FromSlash(specPath)
+	// Read from fs.FS (embed.FS, os.DirFS, etc.)
+	data, err := fs.ReadFile(fsys, specPath)
+	if err != nil {
+		specCache[key] = &specCacheEntry{doc: nil, err: err}
+		return nil, err
+	}
+
 	loader := openapi3.NewLoader()
 	loader.IsExternalRefsAllowed = true
-	doc, err := loader.LoadFromFile(path)
 
-	// Cache result (even if error)
-	specCache[specPath] = &specCacheEntry{doc: doc, err: err}
+	// If you need $ref with relative paths, consider LoadFromDataWithPath
+	doc, err := loader.LoadFromData(data)
+
+	specCache[key] = &specCacheEntry{doc: doc, err: err}
 	return doc, err
 }
 
@@ -78,11 +89,12 @@ func loadSpec(specPath string) (*openapi3.T, error) {
 // The loadErrorHandler is called when the spec fails to load.
 // TODO: use FS abstraction to not reply on specPath string which is brittle
 func OpenAPIValidation(
+	specFS fs.FS,
 	specPath string,
 	errorHandler ValidationErrorHandler,
 	loadErrorHandler SpecLoadErrorHandler,
 ) func(http.Handler) http.Handler {
-	spec, err := loadSpec(specPath)
+	spec, err := loadSpec(specFS, specPath)
 	if err != nil {
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

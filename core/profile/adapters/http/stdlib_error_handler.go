@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -118,6 +119,7 @@ func InternalProblem(detail string) *ErrorResponse {
 
 // ProblemFromDomainError maps domain/service-layer sentinel errors to RFC7807 problems.
 func ProblemFromDomainError(err error) *ErrorResponse {
+	slog.Debug("mapping error", slog.Any("error", err))
 	switch {
 	case errors.Is(err, domain.ErrDuplicateProfile):
 		return ConflictProblem("profile with this name already exists")
@@ -133,12 +135,14 @@ func ProblemFromDomainError(err error) *ErrorResponse {
 // ProblemDetailsResponseErrorHandler centralizes unexpected handler errors
 // occurring after request parsing, emitting a generic 500 Problem.
 func ProblemDetailsResponseErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Debug("handling error", slog.Any("error", err))
 	// Generic 500 Problem for unexpected handler errors.
 	_ = err // avoid leaking internal error details to clients
 	WriteProblem(w, InternalProblem("server error"))
 }
 
 func ProblemDetailsRequestErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Debug("handling error", slog.Any("error", err))
 	// Default to RFC7807 Bad Request for request decoding/binding issues
 	problem := NewErrorResponse(
 		WithTitle("Bad Request"),

@@ -1,34 +1,46 @@
 receivers:
   otlp:
     protocols:
-      grpc: {}
-      http: {}
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
 
 processors:
   batch: {}
-  resource:
-    attributes:
-      - key: deployment.environment
-        action: upsert
-        value: local
+  # Optional but recommended for VM if you use delta temporality anywhere
+  # deltatocumulative:
+  #   max_stale: 5m
 
 exporters:
-  otlp/tempo:
-    endpoint: tempo:4317
+  # Metrics + logs → VictoriaMetrics + VictoriaLogs over OTLP/HTTP
+  otlphttp/victoriametrics:
+    compression: gzip
+    encoding: proto
+    metrics_endpoint: http://victoria-metrics:8428/opentelemetry/v1/metrics
+    logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
     tls:
       insecure: true
-  prometheusremotewrite/mimir:
-    endpoint: http://mimir:9009/api/v1/push
+
+  # Traces → VictoriaTraces over OTLP/gRPC
+  otlp/victoriatraces:
+    endpoint: victoria-traces:4317
     tls:
       insecure: true
 
 service:
   pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [resource, batch]
-      exporters: [otlp/tempo]
     metrics:
       receivers: [otlp]
-      processors: [resource, batch]
-      exporters: [prometheusremotewrite/mimir]
+      processors: [batch] # , deltatocumulative]
+      exporters: [otlphttp/victoriametrics]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/victoriametrics]
+
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/victoriatraces]

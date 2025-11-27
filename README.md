@@ -115,6 +115,72 @@ This stack represents a **"Pure Victoria" High-Performance Architecture**. It mi
 | **Traces**          | **VictoriaTraces**    | `victoria-traces`  | **Trace Storage.** Replaces Tempo/Jaeger. Integrates natively with the Victoria ecosystem and shares the same design philosophy (simple, fast). |
 | **Visualization**   | **Grafana**           | `grafana`          | **The UI.** Connects to VM (Metrics), VLogs (Logs), and VTraces (Traces via Jaeger API) to visualize everything in one place.                   |
 
+#### Kubernetes deployment
+
+- Architecture:
+
+```mermaid
+flowchart LR
+  %% Namespaces
+  subgraph ns_app["Namespace: app"]
+    A[Go Service Pods<br/>e.g. profile-api]
+    AA[Go Auto-Instrumentation sidecar or OTel Operator]
+  end
+
+  subgraph ns_obs["Namespace: observability"]
+    subgraph Col["OpenTelemetry Collector (gateway)"]
+      C_metrics[(OTLP Receiver<br/>metrics)]
+      C_traces[(OTLP Receiver<br/>traces)]
+      C_logs[(OTLP Receiver<br/>logs)]
+    end
+
+    VM[VictoriaMetrics TSDB]
+    VT[VictoriaTraces]
+    VL[VictoriaLogs]
+
+    VMA[vmagent<br/>DaemonSet]
+    FB[Fluent Bit<br/>DaemonSet]
+    VA[vmalert]
+    G[Grafana]
+  end
+
+  subgraph ns_cluster["Cluster components"]
+    N[node-exporter / cAdvisor / kubelet]
+    KSM[kube-state-metrics]
+    CL[Container logs /var/log/containers]
+  end
+
+  %% App-level paths
+  A -->|"OTel SDK metrics\n(OTLP http/protobuf)"| C_metrics
+  A -->|"OTel SDK traces\n(OTLP gRPC)"| C_traces
+  A -->|"OTel SDK logs (optional)\n(OTLP http/protobuf)"| C_logs
+  AA -->|"Auto-instrumented traces\n(OTLP gRPC)"| C_traces
+
+  %% Collector to Victoria stack
+  C_metrics -->|"OTLP /opentelemetry/v1/metrics\nor remote_write"| VM
+  C_traces -->|"OTLP gRPC"| VT
+  C_logs -->|"OTLP HTTP\n/opentelemetry/v1/logs"| VL
+
+  %% Prometheus-style metrics
+  N -->|/metrics scrape| VMA
+  KSM -->|/metrics scrape| VMA
+  A -->|/metrics if exposed| VMA
+  VMA -->|"remote_write\n/api/v1/write"| VM
+
+  %% Logs via Fluent Bit
+  CL --> FB
+  FB -->|"HTTP logs\n(insert endpoint)"| VL
+
+  %% Alerting
+  VA -->|"query\n/ select metrics"| VM
+  VA -->|"alerts / webhooks"| Dst[Alert receivers\ne.g. Slack, PagerDuty]
+
+  %% Grafana reads
+  G <-->|PromQL / GraphQL| VM
+  G <-->|Traces API Jaeger/Tempo compatible| VT
+  G <-->|Logs API\nVictoriaLogs datasource| VL
+```
+
 ### AWS X-Ray ID
 
 https://raw.githubusercontent.com/autopilot-team/interview/refs/heads/main/backends/internal/core/tracer.go

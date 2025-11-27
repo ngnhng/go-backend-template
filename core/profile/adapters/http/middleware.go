@@ -16,6 +16,8 @@ package http
 
 import (
 	"context"
+	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"app/middleware"
@@ -24,14 +26,16 @@ import (
 // RecoverHTTPMiddleware returns a panic recovery middleware configured for the Profile API.
 func RecoverHTTPMiddleware() func(http.Handler) http.Handler {
 	return middleware.Recovery(func(w http.ResponseWriter, r *http.Request, recovered any) {
+		slog.Error("recover middleware", slog.Any("error", recovered))
 		WriteProblem(w, InternalProblem("server error"))
 	})
 }
 
 // ProfileHTTPValidationMiddleware returns an OpenAPI validation middleware for the Profile API.
-func ProfileHTTPValidationMiddleware() func(http.Handler) http.Handler {
+func ProfileHTTPValidationMiddleware(sysFS fs.FS, specPath string) func(http.Handler) http.Handler {
 	return middleware.OpenAPIValidation(
-		"oapi/profile-api-spec.yaml",
+		sysFS,
+		specPath,
 		// Validation error handler
 		func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, statusCode int) {
 			problem := NewErrorResponse(
@@ -50,6 +54,7 @@ func ProfileHTTPValidationMiddleware() func(http.Handler) http.Handler {
 		},
 		// Spec load error handler
 		func(w http.ResponseWriter, r *http.Request, err error) {
+			slog.Debug("validation error", slog.Any("error", err))
 			WriteProblem(w, InternalProblem("server error"))
 		},
 	)

@@ -15,6 +15,7 @@
 package services
 
 import (
+	"io/fs"
 	"net/http"
 
 	profile_api "app/api/profileapi/stdlib"
@@ -23,11 +24,13 @@ import (
 
 // ProfileAPIService encapsulates the registration logic for the Profile API.
 type ProfileAPIService struct {
-	handler profile_api.StrictServerInterface
+	specPath string
+	specFS   fs.FS
+	handler  profile_api.StrictServerInterface
 }
 
-func NewProfileAPIService(h profile_api.StrictServerInterface) *ProfileAPIService {
-	return &ProfileAPIService{handler: h}
+func NewProfileAPIService(h profile_api.StrictServerInterface, specFS fs.FS, specPath string) *ProfileAPIService {
+	return &ProfileAPIService{specFS: specFS, specPath: specPath, handler: h}
 }
 
 // Register configures the strict handler and mounts the profile API routes.
@@ -54,6 +57,6 @@ func (s *ProfileAPIService) Register(mux *http.ServeMux) {
 // Middlewares returns global middlewares required by the Profile API, such as validation.
 func (s *ProfileAPIService) Middlewares() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
-		profile_http.ProfileHTTPValidationMiddleware(),
+		profile_http.ProfileHTTPValidationMiddleware(s.specFS, s.specPath),
 	}
 }

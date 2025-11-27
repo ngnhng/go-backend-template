@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -38,6 +39,9 @@ import (
 	profile_http "app/core/profile/adapters/http"
 	hmac_sign "app/hmac"
 )
+
+//go:embed oapi/*.yaml
+var specFS embed.FS
 
 func main() {
 	exitCode := 0
@@ -120,14 +124,24 @@ func main() {
 	profileApi := profile_http.NewProfileService(
 		postgresConnectionPool, postgresProfilePersistence, signer)
 
+	// Initialize HTTP metrics for middleware-based instrumentation
+	httpMetrics, err := telemetry.NewHTTPMetrics("profile-api")
+	if err != nil {
+		slog.WarnContext(ctx, "failed to initialize HTTP metrics, continuing without metrics", slog.Any("error", err))
+		httpMetrics = nil
+	}
+
 	// Compose enabled services
-	profileSvc := services.NewProfileAPIService(profileApi)
+	profileSvc := services.NewProfileAPIService(profileApi, specFS, "oapi/profile-api-spec.yaml")
 
 	server, err := server.New(
 		"0.0.0.0", 8080,
 		server.WithWriteTimeout(10*time.Second),
 		server.WithServices(profileSvc),
-		server.WithGlobalMiddlewares(profile_http.RecoverHTTPMiddleware()),
+		server.WithGlobalMiddlewares(
+			telemetry.HTTPMetricsMiddleware(httpMetrics),
+			profile_http.RecoverHTTPMiddleware(),
+		),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "init server error", slog.Any("error", err))

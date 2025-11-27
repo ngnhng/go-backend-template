@@ -23,6 +23,10 @@ volumes:
   vlogs_data: {}
   vt_data: {}
 
+networks:
+  app:
+  observability:
+
 services:
   profile-api:
     build:
@@ -37,14 +41,30 @@ services:
         fluentd-async: "true"
         tag: profile-api
     environment:
+      # --- OTel resource ---
       OTEL_SERVICE_NAME: "profile-api"
-      OTEL_GO_AUTO_TARGET_EXE: "profile-api"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,service.version=dev"
-      OTEL_METRICS_EXPORTER: "otlp"
-      OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://victoria-traces:4317"
-      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://victoria-metrics:4317"
+
+      # --- Auto-instrumentation detection for your telemetry.Init ---
+      OTEL_GO_AUTO_TARGET_EXE: "profile-api"
+
+      # --- Send ALL OTLP to the Collector (K8s-style gateway pattern) ---
+      # Traces (gRPC)
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+
+      # Metrics (HTTP, optional but closer to your code)
+      OTEL_METRICS_EXPORTER: "otlp"
+      OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: "http/protobuf"
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "http://otel-collector:4318/v1/metrics"
+      OTEL_EXPORTER_OTLP_METRICS_INSECURE: "true"
+
+      # Logs via OTLP HTTP (if you wire otel logs exporter in Go)
+      OTEL_LOGS_EXPORTER: "otlp"
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/protobuf"
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://otel-collector:4318/v1/logs"
+
+      # --- App deps ---
       POSTGRES_PRIMARY_HOST: "postgres-primary"
       POSTGRES_PRIMARY_PORT: "5432"
       POSTGRES_PRIMARY_DATABASE: "profiledb"
@@ -52,12 +72,13 @@ services:
       POSTGRES_REPLICA_0_PORT: "5432"
       POSTGRES_REPLICA_0_DATABASE: "profiledb"
       HMAC_SECRET: "secret"
+    networks:
+      - app
+      - observability
     ports:
       - "8080:8080"
     depends_on:
       - postgres-primary
-      - postgres-replica
-      - fluent-bit
     profiles:
       - app
       - all
@@ -66,14 +87,16 @@ services:
   otel-agent:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:latest
     privileged: true # Required for eBPF
-    pid: "service:profile-api" # Share PID namespace with the app to see its process
+    pid: "service:profile-api" # Share PID namespace with the app
     environment:
-      # Path to the BINARY inside the 'app' container, not the source code
       - OTEL_GO_AUTO_TARGET_EXE=/profile-api
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://victoria-traces:4317
       - OTEL_SERVICE_NAME=profile-api
-    depends_on:
-      - victoria-metrics
+      # Sidecar also sends to the Collector, not directly to VictoriaTraces
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+    networks:
+      - app
+      - observability
     profiles:
       - sidecar
       - all
@@ -96,6 +119,8 @@ services:
     volumes:
       - pg18-primary-data:/var/lib/postgresql
       - ./deployment/local/postgres18:/docker-entrypoint-initdb.d
+    networks:
+      - app
     profiles:
       - postgres
       - infra
@@ -140,6 +165,8 @@ services:
 
         echo "Starting replica PostgreSQL..."
         exec gosu postgres postgres -c max_connections=200
+    networks:
+      - app
     volumes:
       - pg18-replica-data:/var/lib/postgresql
     profiles:
@@ -148,6 +175,23 @@ services:
       - all
 
   # --- Observability ---
+
+  # Central OTEL gateway (like a K8s "otel-collector" in observability ns)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./deployment/local/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - victoria-metrics
+      - victoria-traces
+      - victoria-logs
+    networks:
+      - observability
+    profiles:
+      - observability
+      - all
+
   grafana:
     image: grafana/grafana
     restart: no
@@ -169,6 +213,8 @@ services:
       - victoria-metrics
     ports:
       - "3000:3000"
+    networks:
+      - observability
     profiles:
       - observability
       - all
@@ -188,6 +234,8 @@ services:
       - "--listen=0.0.0.0:8000"
       - "--cgroupfs-root=/host/sys/fs/cgroup"
       - "--wal-dir=/data"
+    networks:
+      - observability
     profiles:
       - observability
       - all
@@ -197,8 +245,11 @@ services:
     command:
       - --storageDataPath=/vm-data
       - --retentionPeriod=15d
+      - --opentelemetry.usePrometheusNaming
     ports:
       - "8428:8428"
+    networks:
+      - observability
     volumes:
       - vm_data:/vm-data
     profiles:
@@ -215,6 +266,8 @@ services:
     depends_on:
       - victoria-metrics
       - node-agent
+    networks:
+      - observability
     profiles:
       - observability
       - all
@@ -230,6 +283,8 @@ services:
       - ./deployment/local/vmalert/coroot-rules.yml:/etc/vmalert/coroot-rules.yml:ro
     depends_on:
       - victoria-metrics
+    networks:
+      - observability
     profiles:
       - observability
       - all
@@ -243,6 +298,8 @@ services:
       - "9428:9428"
     volumes:
       - vlogs_data:/vlogs-data
+    networks:
+      - observability
     profiles:
       - observability
       - all
@@ -259,6 +316,8 @@ services:
       - "8429:8429" # UI and Jaeger Query API
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
+    networks:
+      - observability
     volumes:
       - vt_data:/vt-data
     profiles:
@@ -274,6 +333,8 @@ services:
       - "24224:24224/udp"
     depends_on:
       - victoria-logs
+    networks:
+      - observability
     profiles:
       - observability
       - all

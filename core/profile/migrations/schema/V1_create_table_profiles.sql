@@ -15,12 +15,12 @@
 CREATE EXTENSION citext;
 
 CREATE TABLE profiles (
-    id          UUID PRIMARY KEY DEFAULT uuidv7(),
-    username    TEXT,
-    email       CITEXT UNIQUE NOT NULL CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
-    age         INTEGER,
-    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    deleted_at  TIMESTAMPTZ,
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    username TEXT,
+    email CITEXT UNIQUE NOT NULL CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
+    age INTEGER,
+    created_at TIMESTAMPTZ DEFAULT current_timestamp,
+    deleted_at TIMESTAMPTZ,
 
     CONSTRAINT chk_valid_age CHECK (age >= 1 AND age <= 150)
 );

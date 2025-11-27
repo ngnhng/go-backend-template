@@ -1,0 +1,79 @@
+package telemetry
+
+import (
+	"context"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+)
+
+// HTTPMetrics holds counters and histograms for HTTP endpoint instrumentation
+type HTTPMetrics struct {
+	requestCounter  metric.Int64Counter
+	durationHisto   metric.Float64Histogram
+	responseSizeHisto metric.Int64Histogram
+}
+
+// NewHTTPMetrics creates a new HTTPMetrics instance for a given service name
+func NewHTTPMetrics(serviceName string) (*HTTPMetrics, error) {
+	meter := otel.Meter(serviceName)
+
+	requestCounter, err := meter.Int64Counter(
+		"http_server_requests_total",
+		metric.WithDescription("Total number of HTTP requests"),
+		metric.WithUnit("{request}"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	durationHisto, err := meter.Float64Histogram(
+		"http_server_duration",
+		metric.WithDescription("HTTP request duration"),
+		metric.WithUnit("ms"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	responseSizeHisto, err := meter.Int64Histogram(
+		"http_server_response_size",
+		metric.WithDescription("HTTP response size in bytes"),
+		metric.WithUnit("By"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &HTTPMetrics{
+		requestCounter:    requestCounter,
+		durationHisto:     durationHisto,
+		responseSizeHisto: responseSizeHisto,
+	}, nil
+}
+
+// RecordRequest records a single HTTP request with its attributes
+func (m *HTTPMetrics) RecordRequest(ctx context.Context, method, endpoint, statusCode string, durationMs float64, responseSize int64) {
+	attrs := []attribute.KeyValue{
+		attribute.String("http_method", method),
+		attribute.String("http_endpoint", endpoint),
+		attribute.String("http_status_code", statusCode),
+	}
+
+	m.requestCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
+	m.durationHisto.Record(ctx, durationMs, metric.WithAttributes(attrs...))
+	if responseSize > 0 {
+		m.responseSizeHisto.Record(ctx, responseSize, metric.WithAttributes(attrs...))
+	}
+}
+
+// MeasureEndpoint is a helper that measures the duration of an operation and records metrics
+func (m *HTTPMetrics) MeasureEndpoint(ctx context.Context, method, endpoint string) func(statusCode string, responseSize int64) {
+	start := time.Now()
+	return func(statusCode string, responseSize int64) {
+		durationMs := float64(time.Since(start).Milliseconds())
+		m.RecordRequest(ctx, method, endpoint, statusCode, durationMs, responseSize)
+	}
+}
