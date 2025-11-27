@@ -4,6 +4,12 @@ Very opinionated setup with specific toolings and conventions that you may or ma
 
 Services in this repository will combine aspects of layered architecture, domain-driven and hexagonal (ports and adapters) to try to produce a readable and maintainable source code.
 
+### Boundary control
+
+golangci-lint & depguard is used to enforce import rules
+
+### Cross-module communication
+
 ## Deployment
 
 ## Choosing between RESTful HTTP and GraphQL

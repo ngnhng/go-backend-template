@@ -40,6 +40,13 @@ import (
 )
 
 func main() {
+	exitCode := 0
+	defer func() {
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+	}()
+
 	// cancel the context when these signals occur
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, os.Interrupt)
 	defer cancel()
@@ -52,27 +59,38 @@ func main() {
 	postgresDBConfig, err := env.ParseAs[postgres.PostgresConnectionConfig]()
 	if err != nil {
 		slog.ErrorContext(ctx, "config error", slog.Any("error", err))
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 	postgresConnectionPool, err := postgres.New(ctx, &postgresDBConfig)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error", slog.Any("error", err))
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
-	if !postgresConnectionPool.HealthCheck() {
-		slog.ErrorContext(ctx, "database health check failed")
-		os.Exit(1)
+	defer func() {
+		if err := postgresConnectionPool.Shutdown(ctx); err != nil {
+			slog.ErrorContext(ctx, "database shutdown error", slog.Any("error", err))
+		}
+	}()
+
+	if err = postgresConnectionPool.HealthCheck(); err != nil {
+		slog.ErrorContext(ctx, "database health check failed", slog.Any("error", err))
+		exitCode = 1
+		return
 	}
 
 	hmacConfig, err := env.ParseAs[hmac_sign.HMACConfig]()
 	if err != nil {
-		slog.ErrorContext(ctx, "hmac key not configured")
-		os.Exit(1)
+		slog.ErrorContext(ctx, "hmac key not configured", slog.Any("error", err))
+		exitCode = 1
+		return
 	}
 	signer, err := hmac_sign.NewHMACSigner([]byte(hmacConfig.Secret))
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac signer setup error", slog.Any("error", err))
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	postgresProfilePersistence := &persistence.PostgresProfilePersistence{
@@ -81,15 +99,21 @@ func main() {
 
 	telemetryConfig, err := env.ParseAs[telemetry.Config]()
 	if err != nil {
-		slog.ErrorContext(ctx, "telemetry not properly configured")
-		os.Exit(1)
+		slog.ErrorContext(ctx, "telemetry not properly configured", slog.Any("error", err))
+		exitCode = 1
+		return
 	}
 	otelShutdown, err := telemetry.Init(ctx, telemetryConfig)
 	if err != nil {
-		slog.ErrorContext(ctx, "telemetry not properly configured")
-		os.Exit(1)
+		slog.ErrorContext(ctx, "telemetry not properly configured", slog.Any("error", err))
+		exitCode = 1
+		return
 	}
-	defer otelShutdown(ctx)
+	defer func() {
+		if err := otelShutdown(ctx); err != nil {
+			slog.ErrorContext(ctx, "telemetry shutdown error", slog.Any("error", err))
+		}
+	}()
 
 	// --- application layer ---
 
@@ -107,12 +131,13 @@ func main() {
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "init server error", slog.Any("error", err))
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	if err := server.Run(ctx); err != nil {
 		slog.ErrorContext(ctx, "running server error", slog.Any("error", err))
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
-	os.Exit(0)
 }

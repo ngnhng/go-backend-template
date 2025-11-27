@@ -17,9 +17,9 @@ package serde
 // Helper to address the UnaddressableOperand issue.
 //
 // An expression is addressable if it denotes a specific, stable storage location in memory.
-// A function's result is a rvalue and Go distinguishes between value (rvalue) and variable.
+// Value such as a function's result is a rvalue a.k.a temporary value and many programming languages including Go distinguishes between value (rvalue) and variable.
 //
-// In Go, values (rvalues) may exists only transiently (in registers, on stack or be optimized away) so they are not addressable.
+// In Go, values (rvalue) may exists only transiently (in registers, on stack or be optimized away) so they are not addressable.
 // Allowing rvalue addressability would complicate lifetime semantics and disallow some optimizations.
 //
 // Ptr returns &v, which basically allocates a cell for the value v (allocate the literal and return its pointer).

@@ -34,5 +34,5 @@ type Config struct {
 	DisableMetrics bool `envDefault:"false"`
 
 	// Extra resource attributes.
-	ResourceAttrs map[string]string `env:"OTEL_RESOURCE_ATTRIBUTES" envDefault:"deployment.environment=local,service.version=dev" envSeparator:"," envKeySeparator:"="`
+	ResourceAttrs map[string]string `env:"OTEL_RESOURCE_ATTRIBUTES" envDefault:"deployment.environment=local,service.version=dev" envSeparator:"," envKeyValSeparator:"="`
 }

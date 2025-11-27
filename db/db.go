@@ -36,12 +36,15 @@ type (
 		ConnectionManager
 		MigrationManager
 		TxManager
+
+		// Shutdown attempts to gracefully close all underlying connections.
+		Shutdown(context.Context) error
 	}
 
 	HealthManager interface {
 		// TODO: It is more complicated than just a boolean.
 		// We need to keep track of multiple instances/databases
-		HealthCheck() bool
+		HealthCheck() error
 	}
 
 	// ConnectionManager tries to apply read-replica pattern whenever possible

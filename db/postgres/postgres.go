@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -56,8 +57,8 @@ type (
 
 	PoolConfig struct {
 		Host         string `env:"HOST"     envDefault:"localhost"`
-		Port         uint16 `env:"USER"     envDefault:"5432"`
-		User         string `env:"PORT"     envDefault:"postgres"`
+		Port         uint16 `env:"PORT"     envDefault:"5432"`
+		User         string `env:"USER"     envDefault:"postgres"`
 		Password     string `env:"PASSWORD" envDefault:"postgres"`
 		Database     string `env:"DATABASE" envDefault:"postgres"`
 		PoolMaxConns int    `env:"POOL_MAX_CONNS" envDefault:"5"`
@@ -70,16 +71,16 @@ func (p *PostgresConnectionPool) GenerateMigration() error {
 }
 
 // HealthCheck implements db.ConnectionPool.
-func (p *PostgresConnectionPool) HealthCheck() bool {
+func (p *PostgresConnectionPool) HealthCheck() error {
 	ctx := context.Background()
 	conn, err := p.writer.Connx(ctx)
 	if err != nil {
-		return false
+		return err
 	}
 
 	// TODO: Make this query configurable
 	_, err = conn.ExecContext(ctx, "SELECT 1")
-	return err != nil
+	return err
 }
 
 // MigrateDown implements db.ConnectionPool.
@@ -170,6 +171,40 @@ func (p *PostgresConnectionPool) WithTx(ctx context.Context, fn func(context.Con
 	}
 
 	return tx.Commit()
+}
+
+// Shutdown implements db.ConnectionPool.
+func (p *PostgresConnectionPool) Shutdown(_ context.Context) error {
+	if p == nil {
+		return nil
+	}
+
+	var errs []error
+
+	if p.writer != nil {
+		if err := p.writer.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	for _, reader := range p.readers {
+		if reader == nil {
+			continue
+		}
+		if err := reader.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// Using errors.Join() can blow up memory if we have big nested structures (https://github.com/golangci/golangci-lint/issues/5883)
+	// Don't:
+	// 		for _, e := range someErrors {
+	// 			err = errors.Join(err, e) // join previous joined error again
+	// 		}
+	//
+	// Do:
+	//     err = errors.Join(errs...) // single, flat join
+	return errors.Join(errs...)
 }
 
 // Writer implements db.ConnectionPool.

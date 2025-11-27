@@ -76,6 +76,7 @@ func loadSpec(specPath string) (*openapi3.T, error) {
 // The specPath is relative to the project root (e.g., "oapi/profile-api-spec.yaml").
 // The errorHandler is called when validation fails.
 // The loadErrorHandler is called when the spec fails to load.
+// TODO: use FS abstraction to not reply on specPath string which is brittle
 func OpenAPIValidation(
 	specPath string,
 	errorHandler ValidationErrorHandler,

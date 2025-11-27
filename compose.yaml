@@ -32,6 +32,10 @@ services:
     shm_size: 256mb
     logging:
       driver: fluentd
+      options:
+        fluentd-address: fluent-bit:24224
+        fluentd-async: "true"
+        tag: profile-api
     environment:
       OTEL_SERVICE_NAME: "profile-api"
       OTEL_GO_AUTO_TARGET_EXE: "profile-api"
@@ -47,13 +51,15 @@ services:
       POSTGRES_REPLICA_0_HOST: "postgres-replica"
       POSTGRES_REPLICA_0_PORT: "5432"
       POSTGRES_REPLICA_0_DATABASE: "profiledb"
+      HMAC_SECRET: "secret"
     ports:
       - "8080:8080"
     depends_on:
       - postgres-primary
       - postgres-replica
+      - fluent-bit
     profiles:
-      - profile-api
+      - app
       - all
 
   # The Auto-Instrumentation Agent (Sidecar)
@@ -86,7 +92,7 @@ services:
       -c max_wal_senders=10
       -c max_replication_slots=10
       -c hot_standby=on
-      -c max_connections=200
+      -c max_connections=100
     volumes:
       - pg18-primary-data:/var/lib/postgresql
       - ./deployment/local/postgres18:/docker-entrypoint-initdb.d
