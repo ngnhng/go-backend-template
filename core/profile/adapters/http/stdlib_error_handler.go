@@ -31,7 +31,8 @@ type (
 	ErrorResponseOption func(*ErrorResponse)
 )
 
-func writeProblem(w http.ResponseWriter, p *ErrorResponse) {
+// WriteProblem writes an RFC7807 problem details response to the HTTP response writer.
+func WriteProblem(w http.ResponseWriter, p *ErrorResponse) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(p.Status)
 	_ = json.NewEncoder(w).Encode(p)
@@ -134,7 +135,7 @@ func ProblemFromDomainError(err error) *ErrorResponse {
 func ProblemDetailsResponseErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	// Generic 500 Problem for unexpected handler errors.
 	_ = err // avoid leaking internal error details to clients
-	writeProblem(w, InternalProblem("server error"))
+	WriteProblem(w, InternalProblem("server error"))
 }
 
 func ProblemDetailsRequestErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
@@ -165,5 +166,5 @@ func ProblemDetailsRequestErrorHandler(w http.ResponseWriter, r *http.Request, e
 		}
 	}
 
-	writeProblem(w, problem)
+	WriteProblem(w, problem)
 }

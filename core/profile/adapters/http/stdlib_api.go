@@ -33,6 +33,7 @@ import (
 	"github.com/oapi-codegen/runtime/types"
 )
 
+// TODO: less lines
 // Controller implementation of the oapi-codegen generated HTTP API handlers
 type ProfileAPI struct {
 	app *domain.Application
