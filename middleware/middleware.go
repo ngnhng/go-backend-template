@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package telemetry
+package middleware
 
 import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"app/telemetry"
 )
 
 // responseRecorder wraps http.ResponseWriter to capture status code and response size
@@ -53,12 +55,12 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// HTTPMetricsMiddleware creates a middleware that records metrics for ALL HTTP requests.
+// Telemetry creates a middleware that records metrics for ALL HTTP requests.
 // This middleware wraps the ResponseWriter to capture status codes and response sizes
 // from any layer (validation middleware, handlers, error handlers, etc.).
 //
 // Place this as the FIRST middleware in the chain to ensure complete coverage.
-func HTTPMetricsMiddleware(metrics *HTTPMetrics) func(http.Handler) http.Handler {
+func Telemetry(metrics *telemetry.HTTPMetrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip metrics if not configured

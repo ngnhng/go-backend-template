@@ -45,7 +45,7 @@ services:
       OTEL_SERVICE_NAME: "profile-api"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,service.version=dev"
 
-      # --- Auto-instrumentation detection for your telemetry.Init ---
+      # --- Auto-instrumentation detection (telemetry.Init) ---
       OTEL_GO_AUTO_TARGET_EXE: "profile-api"
 
       # --- Send ALL OTLP to the Collector (K8s-style gateway pattern) ---
@@ -53,13 +53,13 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
 
-      # Metrics (HTTP, optional but closer to your code)
+      # Metrics
       OTEL_METRICS_EXPORTER: "otlp"
       OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: "http/protobuf"
       OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "http://otel-collector:4318/v1/metrics"
       OTEL_EXPORTER_OTLP_METRICS_INSECURE: "true"
 
-      # Logs via OTLP HTTP (if you wire otel logs exporter in Go)
+      # Logs via OTLP HTTP (if we wire otel logs exporter in Go)
       OTEL_LOGS_EXPORTER: "otlp"
       OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/protobuf"
       OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://otel-collector:4318/v1/logs"

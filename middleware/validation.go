@@ -84,7 +84,6 @@ func loadSpec(fsys fs.FS, specPath string) (*openapi3.T, error) {
 }
 
 // OpenAPIValidation creates a middleware that validates requests against an OpenAPI spec.
-// The specPath is relative to the project root (e.g., "oapi/profile-api-spec.yaml").
 // The errorHandler is called when validation fails.
 // The loadErrorHandler is called when the spec fails to load.
 // TODO: use FS abstraction to not reply on specPath string which is brittle

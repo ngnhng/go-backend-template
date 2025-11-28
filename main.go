@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"app/db/postgres"
+	"app/middleware"
 	"app/server"
 	"app/services"
 	"app/telemetry"
@@ -40,6 +41,8 @@ import (
 	hmac_sign "app/hmac"
 )
 
+// OpenAPI specs for request validation at runtime
+//
 //go:embed oapi/*.yaml
 var specFS embed.FS
 
@@ -131,7 +134,6 @@ func main() {
 		httpMetrics = nil
 	}
 
-	// Compose enabled services
 	profileSvc := services.NewProfileAPIService(profileApi, specFS, "oapi/profile-api-spec.yaml")
 
 	server, err := server.New(
@@ -139,7 +141,7 @@ func main() {
 		server.WithWriteTimeout(10*time.Second),
 		server.WithServices(profileSvc),
 		server.WithGlobalMiddlewares(
-			telemetry.HTTPMetricsMiddleware(httpMetrics),
+			middleware.Telemetry(httpMetrics),
 			profile_http.RecoverHTTPMiddleware(),
 		),
 	)

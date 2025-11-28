@@ -193,6 +193,8 @@ https://raw.githubusercontent.com/autopilot-team/interview/refs/heads/main/backe
 
 ### Migration
 
+Bring your own migration, the repository provided an optional setup using `dbmate`
+
 ### Read replica pattern
 
 One pattern for optimizing the response time of a database query is to separate the read and write process, from the application level down to the network level. The read replica pattern separates read and write at the instance level, meaning we read and write to different database instances, and the changes get synced eventually, thus ensuring eventual consistency.
