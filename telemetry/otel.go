@@ -260,7 +260,6 @@ func buildGRPCTraceExporter(ctx context.Context, cfg Config) (sdktrace.SpanExpor
 	}
 
 	// If neither OTLPEndpoint nor Insecure provided, exporter relies on OTEL_EXPORTER_OTLP_* env vars.
-
 	return otlptracegrpc.New(ctx, opts...)
 }
 

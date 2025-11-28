@@ -134,7 +134,11 @@ func main() {
 		httpMetrics = nil
 	}
 
-	profileSvc := services.NewProfileAPIService(profileApi, specFS, "oapi/profile-api-spec.yaml")
+	profileSvc := services.NewProfileAPIService(
+		profileApi,
+		specFS,
+		"oapi/profile-api-spec.yaml",
+	)
 
 	server, err := server.New(
 		"0.0.0.0", 8080,

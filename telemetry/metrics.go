@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -11,8 +10,8 @@ import (
 
 // HTTPMetrics holds counters and histograms for HTTP endpoint instrumentation
 type HTTPMetrics struct {
-	requestCounter  metric.Int64Counter
-	durationHisto   metric.Float64Histogram
+	requestCounter    metric.Int64Counter
+	durationHisto     metric.Float64Histogram
 	responseSizeHisto metric.Int64Histogram
 }
 
@@ -66,14 +65,5 @@ func (m *HTTPMetrics) RecordRequest(ctx context.Context, method, endpoint, statu
 	m.durationHisto.Record(ctx, durationMs, metric.WithAttributes(attrs...))
 	if responseSize > 0 {
 		m.responseSizeHisto.Record(ctx, responseSize, metric.WithAttributes(attrs...))
-	}
-}
-
-// MeasureEndpoint is a helper that measures the duration of an operation and records metrics
-func (m *HTTPMetrics) MeasureEndpoint(ctx context.Context, method, endpoint string) func(statusCode string, responseSize int64) {
-	start := time.Now()
-	return func(statusCode string, responseSize int64) {
-		durationMs := float64(time.Since(start).Milliseconds())
-		m.RecordRequest(ctx, method, endpoint, statusCode, durationMs, responseSize)
 	}
 }
