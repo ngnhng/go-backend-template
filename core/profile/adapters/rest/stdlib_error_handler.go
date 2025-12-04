@@ -22,9 +22,9 @@ import (
 	"net/http"
 	"strconv"
 
-	api "app/api/profileapi/stdlib"
-	"app/api/serde"
 	"app/core/profile/domain"
+	api "app/modules/api/profileapi/stdlib"
+	"app/modules/api/serde"
 )
 
 type (
@@ -113,6 +113,11 @@ func ConflictProblem(detail string, opts ...ErrorResponseOption) *ErrorResponse 
 	return NewErrorResponse(append(base, opts...)...)
 }
 
+func PreconditionProblem(detail string, opts ...ErrorResponseOption) *ErrorResponse {
+	base := []ErrorResponseOption{WithTitle("Precondition Failed"), WithStatus(http.StatusPreconditionFailed), WithDetail(detail)}
+	return NewErrorResponse(append(base, opts...)...)
+}
+
 func InternalProblem(detail string) *ErrorResponse {
 	return NewErrorResponse(WithTitle("Internal Server Error"), WithStatus(http.StatusInternalServerError), WithDetail(detail))
 }
@@ -127,6 +132,8 @@ func ProblemFromDomainError(err error) *ErrorResponse {
 		return ValidationProblem("validation failed")
 	case errors.Is(err, domain.ErrProfileNotFound):
 		return NewErrorResponse(WithTitle("Not Found"), WithStatus(http.StatusNotFound), WithDetail("profile not found"))
+	case errors.Is(err, domain.ErrPrecondition):
+		return PreconditionProblem("precondition failed")
 	default:
 		return InternalProblem("server error")
 	}

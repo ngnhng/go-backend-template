@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"app/db"
+	"app/modules/db"
 
 	_ "github.com/caarlos0/env/v11" // what we should use to parse env
 

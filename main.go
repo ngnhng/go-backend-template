@@ -27,23 +27,23 @@ import (
 	"syscall"
 	"time"
 
-	"app/db/postgres"
-	"app/middleware"
-	"app/server"
-	"app/services"
-	"app/telemetry"
+	"app/modules/db/postgres"
+	hmac_sign "app/modules/hmac"
+	"app/modules/middleware"
+	"app/modules/server"
+	"app/modules/services"
+	"app/modules/telemetry"
 
 	"github.com/caarlos0/env/v11"
 
 	"app/core/profile/adapters/persistence"
 
-	profile_http "app/core/profile/adapters/http"
-	hmac_sign "app/hmac"
+	profile_http "app/core/profile/adapters/rest"
 )
 
 // OpenAPI specs for request validation at runtime
 //
-//go:embed oapi/*.yaml
+//go:embed modules/oapi/*.yaml
 var specFS embed.FS
 
 func main() {

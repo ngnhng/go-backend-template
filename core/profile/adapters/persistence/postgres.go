@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"app/core/profile/domain"
-	"app/db"
+	"app/modules/db"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -45,15 +45,25 @@ type (
 	// ProfileRow is the persistence entity shape used by storage adapters.
 	ProfileRow struct {
 		ID        uuid.UUID     `db:"id"`
+		Version   sql.NullInt64 `db:"version_number"`
 		Name      string        `db:"username"`
 		Email     string        `db:"email"`
 		Age       sql.NullInt32 `db:"age"`
 		CreatedAt time.Time     `db:"created_at"`
+		UpdatedAt time.Time     `db:"updated_at"`
+		DeletedAt time.Time     `db:"deleted_at"`
 	}
 )
 
 func toProfile(row ProfileRow) domain.Profile {
-	return domain.Profile(row)
+	return domain.Profile{
+		ID:        row.ID,
+		Name:      row.Name,
+		Email:     row.Email,
+		Age:       int(row.Age.Int32),
+		CreatedAt: row.CreatedAt,
+		Version:   int64(row.Version.Int64),
+	}
 }
 
 func toProfiles(rows []ProfileRow) []domain.Profile {
@@ -178,32 +188,15 @@ func (p *PostgresProfilePersistence) GetProfileByID(ctx context.Context, q db.Qu
 	return &prof, nil
 }
 
-// UpdateProfile updates username and optionally email, returning the updated entity.
-func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Querier, id uuid.UUID, name string, email *string) (*domain.Profile, error) {
-	if len(name) == 0 {
-		return nil, domain.ErrInvalidData
-	}
-	var (
-		query string
-		args  []any
-	)
-	if email != nil {
-		query = fmt.Sprintf(`
+// UpdateProfile updates username/email with optimistic concurrency, returning the updated entity.
+func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Querier, params *domain.UpdateProfileParams) (*domain.Profile, error) {
+	query := fmt.Sprintf(`
             UPDATE %s
-            SET username = $2, email = $3
-            WHERE id = $1 AND deleted_at IS NULL
-            RETURNING id, username, email, age, created_at
+            SET username = $2, email = $3, version_number = version_number + 1
+            WHERE id = $1 AND deleted_at IS NULL AND version_number = $4
+            RETURNING id, username, email, age, created_at, version_number
         `, p.TableName)
-		args = []any{id, name, *email}
-	} else {
-		query = fmt.Sprintf(`
-            UPDATE %s
-            SET username = $2
-            WHERE id = $1 AND deleted_at IS NULL
-            RETURNING id, username, email, age, created_at
-        `, p.TableName)
-		args = []any{id, name}
-	}
+	args := []any{params.ID, params.Name, params.Email, params.Version}
 	var profRow ProfileRow
 	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {
 		var pgErr *pgconn.PgError
@@ -216,22 +209,22 @@ func (p *PostgresProfilePersistence) UpdateProfile(ctx context.Context, q db.Que
 	return &prof, nil
 }
 
-// DeleteProfile performs a soft delete; returns sql.ErrNoRows if not found.
-func (p *PostgresProfilePersistence) DeleteProfile(ctx context.Context, q db.Querier, id uuid.UUID) error {
+// DeleteProfile performs a soft delete with optimistic concurrency; returns sql.ErrNoRows if not found or precondition fails.
+func (p *PostgresProfilePersistence) DeleteProfile(ctx context.Context, q db.Querier, id uuid.UUID, version int64) error {
 	query := fmt.Sprintf(`
-        UPDATE %s SET deleted_at = CURRENT_TIMESTAMP
-        WHERE id = $1 AND deleted_at IS NULL
+        UPDATE %s SET deleted_at = CURRENT_TIMESTAMP, version_number = version_number + 1
+        WHERE id = $1 AND deleted_at IS NULL AND version_number = $2
         RETURNING id
     `, p.TableName)
 	var ret uuid.UUID
-	if err := sqlx.GetContext(ctx, q, &ret, query, id); err != nil {
+	if err := sqlx.GetContext(ctx, q, &ret, query, id, version); err != nil {
 		return err
 	}
 	return nil
 }
 
 // ModifyProfile performs partial updates based on provided fields.
-func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Querier, id uuid.UUID, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*domain.Profile, error) {
+func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Querier, id uuid.UUID, version int64, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*domain.Profile, error) {
 	if !nameSet && !ageSet && !emailSet {
 		return nil, domain.ErrInvalidData
 	}
@@ -261,12 +254,18 @@ func (p *PostgresProfilePersistence) ModifyProfile(ctx context.Context, q db.Que
 		args = append(args, emailVal)
 		idx++
 	}
+	// Always increment version for optimistic locking
+	sets = append(sets, "version_number = version_number + 1")
+	// Add version to args for WHERE clause
+	args = append(args, version)
+	versionIdx := idx
+
 	query := fmt.Sprintf(`
         UPDATE %s
         SET %s
-        WHERE id = $1 AND deleted_at IS NULL
-        RETURNING id, username, email, age, created_at
-    `, p.TableName, strings.Join(sets, ", "))
+        WHERE id = $1 AND deleted_at IS NULL AND version_number = $%d
+        RETURNING id, username, email, age, created_at, version_number
+    `, p.TableName, strings.Join(sets, ", "), versionIdx)
 
 	var profRow ProfileRow
 	if err := sqlx.GetContext(ctx, q, &profRow, query, args...); err != nil {

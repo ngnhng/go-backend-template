@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"app/db"
+	"app/modules/db"
 
 	"github.com/gofrs/uuid/v5"
 )
@@ -17,7 +17,7 @@ type ProfilePersistence interface {
 	GetProfilesByCursor(context.Context, db.Querier, time.Time, uuid.UUID, CursorDirection, int) ([]Profile, error)
 	GetProfilesFirstPage(context.Context, db.Querier, int) ([]Profile, error)
 	GetProfileByID(context.Context, db.Querier, uuid.UUID) (*Profile, error)
-	UpdateProfile(context.Context, db.Querier, uuid.UUID, string, *string) (*Profile, error)
-	ModifyProfile(context.Context, db.Querier, uuid.UUID, bool, bool, string, bool, bool, int32, bool, string) (*Profile, error)
-	DeleteProfile(context.Context, db.Querier, uuid.UUID) error
+	UpdateProfile(context.Context, db.Querier, *UpdateProfileParams) (*Profile, error)
+	ModifyProfile(context.Context, db.Querier, uuid.UUID, int64, bool, bool, string, bool, bool, int32, bool, string) (*Profile, error)
+	DeleteProfile(context.Context, db.Querier, uuid.UUID, int64) error
 }

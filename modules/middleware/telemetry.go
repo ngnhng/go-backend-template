@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"app/telemetry"
+	"app/modules/telemetry"
 )
 
 // responseRecorder wraps http.ResponseWriter to capture status code and response size

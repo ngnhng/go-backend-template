@@ -3,7 +3,9 @@ version: "2"
 linters:
   enable:
     - bodyclose
-    # - exhaustive
+    - exhaustive
+    - exhaustruct
+    - depguard
     # - goconst
     # - godot
     # - godox
@@ -48,16 +50,16 @@ linters:
             - "core/*/domain/**/*.go"
           allow:
             - $gostd
-            - "app/db$"                # Only db interface package
-            - "app/core/*/domain"      # Domains can import other service domains
+            - "app/modules/db$" # Only db interface package
+            - "app/modules/core/*/domain" # Domains can import other service domains
           deny:
-            - pkg: "app/api"
+            - pkg: "app/modules/api"
               desc: "domain layer must not depend on transport models"
-            - pkg: "app/server"
+            - pkg: "app/modules/server"
               desc: "domain layer must not depend on HTTP wiring"
-            - pkg: "app/db/postgres"
+            - pkg: "app/modules/db/postgres"
               desc: "domain layer must use db interfaces, not implementations"
-            - pkg: "app/core/*/adapters"
+            - pkg: "app/modules/core/*/adapters"
               desc: "domain layer must not depend on adapters"
 
         # HTTP Adapters - ALL HTTP transport adapters (profile, user, payment, etc.)
@@ -67,13 +69,13 @@ linters:
             - "core/*/adapters/http/**/*.go"
           allow:
             - $gostd
-            - "app/api"                # Can use generated API models
-            - "app/core/*/domain"      # Can call domain layer
-            - "app/db$"                # Can use db interfaces for injection
+            - "app/modules/api" # Can use generated API models
+            - "app/modules/core/*/domain" # Can call domain layer
+            - "app/modules/db$" # Can use db interfaces for injection
           deny:
-            - pkg: "app/server"
+            - pkg: "app/modules/server"
               desc: "HTTP adapters should not directly import server package"
-            - pkg: "app/db/postgres"
+            - pkg: "app/modules/db/postgres"
               desc: "should depend on db interfaces, not implementations"
 
         # Persistence Adapters - ALL database adapters (profile, user, payment, etc.)
@@ -83,12 +85,12 @@ linters:
             - "core/*/adapters/persistence/**/*.go"
           allow:
             - $gostd
-            - "app/db"                 # Can use db package and implementations
-            - "app/core/*/domain"      # Can use domain types
+            - "app/modules/db" # Can use db package and implementations
+            - "app/modules/core/*/domain" # Can use domain types
           deny:
-            - pkg: "app/api"
+            - pkg: "app/modules/api"
               desc: "persistence layer must not depend on transport models"
-            - pkg: "app/server"
+            - pkg: "app/modules/server"
               desc: "persistence layer must not depend on HTTP wiring"
 
 issues:

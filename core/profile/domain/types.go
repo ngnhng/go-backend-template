@@ -1,10 +1,10 @@
 package domain
 
 import (
-	"database/sql"
+	"strconv"
 	"time"
 
-	"app/db"
+	"app/modules/db"
 
 	"github.com/gofrs/uuid/v5"
 )
@@ -21,10 +21,16 @@ type (
 		ID        uuid.UUID
 		Name      string
 		Email     string
-		Age       sql.NullInt32
+		Age       int
 		CreatedAt time.Time
+
+		Version int64
 	}
 )
+
+func (p *Profile) V() string {
+	return strconv.Itoa(int(p.Version))
+}
 
 const (
 	ASC  CursorDirection = "asc"

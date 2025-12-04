@@ -20,7 +20,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"app/middleware"
+	"app/modules/middleware"
 )
 
 // RecoverHTTPMiddleware returns a panic recovery middleware configured for the Profile API.

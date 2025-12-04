@@ -11,24 +11,31 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func (app *Application) UpdateProfile(ctx context.Context, id uuid.UUID, name string, email *string) (*Profile, error) {
-	if id.IsNil() || len(name) == 0 {
+type UpdateProfileParams struct {
+	ID      uuid.UUID
+	Name    string
+	Email   string
+	Version int64
+}
+
+func (app *Application) UpdateProfile(ctx context.Context, p *UpdateProfileParams) (*Profile, error) {
+	if p == nil || p.ID.IsNil() || len(p.Name) == 0 || len(p.Email) == 0 {
 		return nil, ErrInvalidData
 	}
 	var updated *Profile
 	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		p, err := app.persistence.UpdateProfile(ctx, tx, id, name, email)
+		profile, err := app.persistence.UpdateProfile(ctx, tx, p)
 		if err != nil {
 			return err
 		}
-		updated = p
+		updated = profile
 		return nil
 	})
 	if err == nil {
 		return updated, nil
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrProfileNotFound
+		return nil, ErrPrecondition
 	}
 	if errors.Is(err, ErrDuplicateProfile) {
 		return nil, ErrDuplicateProfile
@@ -41,7 +48,7 @@ func (app *Application) UpdateProfile(ctx context.Context, id uuid.UUID, name st
 }
 
 // ModifyProfile applies a partial update: only provided fields are updated.
-func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*Profile, error) {
+func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, version int64, nameSet bool, nameNull bool, nameVal string, ageSet bool, ageNull bool, ageVal int32, emailSet bool, emailVal string) (*Profile, error) {
 	if id.IsNil() {
 		return nil, ErrInvalidData
 	}
@@ -50,7 +57,7 @@ func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, nameSet
 	}
 	var updated *Profile
 	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		p, err := app.persistence.ModifyProfile(ctx, tx, id, nameSet, nameNull, nameVal, ageSet, ageNull, ageVal, emailSet, emailVal)
+		p, err := app.persistence.ModifyProfile(ctx, tx, id, version, nameSet, nameNull, nameVal, ageSet, ageNull, ageVal, emailSet, emailVal)
 		if err != nil {
 			return err
 		}
@@ -61,7 +68,7 @@ func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, nameSet
 		return updated, nil
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrProfileNotFound
+		return nil, ErrPrecondition
 	}
 	if errors.Is(err, ErrDuplicateProfile) {
 		return nil, ErrDuplicateProfile

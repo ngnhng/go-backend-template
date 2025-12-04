@@ -1,0 +1,41 @@
+// Copyright 2025 Nguyen Nhat Nguyen
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package services
+
+import (
+	"net/http"
+
+	paymentapi "app/modules/api/paymentapi/stdlib"
+)
+
+// PaymentAPIService encapsulates registration for the Payment API.
+type PaymentAPIService struct {
+	handler paymentapi.ServerInterface
+}
+
+func NewPaymentAPIService(h paymentapi.ServerInterface) *PaymentAPIService {
+	return &PaymentAPIService{handler: h}
+}
+
+func (s *PaymentAPIService) Register(mux *http.ServeMux) {
+	if s.handler == nil {
+		return
+	}
+	paymentapi.HandlerFromMux(s.handler, mux)
+}
+
+func (s *PaymentAPIService) Middlewares() []func(http.Handler) http.Handler {
+	return nil
+}

@@ -48,6 +48,10 @@ paths:
             Link:
               description: RFC 8288 Web Linking (e.g., rel="next", rel="prev")
               schema: { type: string }
+            ETag:
+              description: Collection-level entity tag for cache validation
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -69,8 +73,7 @@ paths:
           description: Created
           headers:
             Location:
-              description: URI of the created profile
-              schema: { type: string, format: uri }
+              $ref: "#/components/headers/Location"
           content:
             application/json:
               schema:
@@ -90,6 +93,9 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -105,17 +111,22 @@ paths:
       operationId: updateProfile
       parameters:
         - $ref: "#/components/parameters/ProfileId"
+        - $ref: "#/components/parameters/RequiredIfMatch"
       requestBody:
         $ref: "#/components/requestBodies/CreateProfile"
       responses:
         "200":
           description: Updated
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessProfile"
         "400": { $ref: "#/components/responses/ProblemResponse" }
         "404": { $ref: "#/components/responses/ProblemResponse" }
+        "412": { $ref: "#/components/responses/PreconditionFailedResponse" }
         "422": { $ref: "#/components/responses/ProblemResponse" }
         default:
           $ref: "#/components/responses/ProblemResponse"
@@ -126,6 +137,7 @@ paths:
       operationId: modifyProfile
       parameters:
         - $ref: "#/components/parameters/ProfileId"
+        - $ref: "#/components/parameters/RequiredIfMatch"
       requestBody:
         $ref: "#/components/requestBodies/ModifyProfile"
       responses:
@@ -137,6 +149,7 @@ paths:
                 $ref: "#/components/schemas/SuccessProfile"
         "400": { $ref: "#/components/responses/ProblemResponse" }
         "404": { $ref: "#/components/responses/ProblemResponse" }
+        "412": { $ref: "#/components/responses/PreconditionFailedResponse" }
         "422": { $ref: "#/components/responses/ProblemResponse" }
         default:
           $ref: "#/components/responses/ProblemResponse"
@@ -147,11 +160,13 @@ paths:
       operationId: deleteProfile
       parameters:
         - $ref: "#/components/parameters/ProfileId"
+        - $ref: "#/components/parameters/RequiredIfMatch"
       responses:
         "204":
           description: Deleted (no content)
         "400": { $ref: "#/components/responses/ProblemResponse" }
         "404": { $ref: "#/components/responses/ProblemResponse" }
+        "412": { $ref: "#/components/responses/PreconditionFailedResponse" }
         default:
           $ref: "#/components/responses/ProblemResponse"
 
@@ -166,9 +181,27 @@ paths:
 
 components:
   ############################
+  # Headers
+  ############################
+  headers:
+    Location:
+      description: URI of the created resource
+      schema: { type: string, format: uri }
+    ETag:
+      description: Entity tag for cache validation
+      schema:
+        $ref: "#/components/schemas/ETagValue"
+  ############################
   # Parameters
   ############################
   parameters:
+    RequiredIfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Match against current entity tag to allow update
+      schema:
+        $ref: "#/components/schemas/ETagValue"
     ProfileId:
       name: id
       in: path
@@ -179,7 +212,7 @@ components:
       name: page
       in: query
       description: 0-based page number (use with `pageSize`)
-      schema: { type: integer, minimum: 0 , maximum: 1000 }
+      schema: { type: integer, minimum: 0, maximum: 1000 }
     PageSize:
       name: pageSize
       in: query
@@ -323,13 +356,24 @@ components:
         totalPages: { type: integer, minimum: 0 }
         traceId: { type: string }
         requestId: { type: string }
+        etags:
+          type: object
+          description: Mapping of item UUIDs to their ETags for optimistic concurrency control
+          additionalProperties:
+            type: string
+            description: ETag value for the item
+            example: "v:123"
         links:
           type: object
           additionalProperties: false
           properties:
             next: { type: string, format: uri }
             prev: { type: string, format: uri }
-
+    ETagValue:
+      type: string
+      pattern: '^W/?"[A-Za-z0-9._-]+"$'
+      minLength: 10
+      maxLength: 50
     CursorMeta:
       type: object
       additionalProperties: false
@@ -343,6 +387,13 @@ components:
         prevCursor: { type: string }
         traceId: { type: string }
         requestId: { type: string }
+        etags:
+          type: object
+          description: Mapping of item UUIDs to their ETags for optimistic concurrency control
+          additionalProperties:
+            type: string
+            description: ETag value for the item
+            example: "v:123"
         links:
           type: object
           additionalProperties: false
@@ -356,6 +407,15 @@ components:
   responses:
     ProblemResponse:
       description: RFC 7807 Problem Details
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PreconditionFailedResponse:
+      description: Precondition failed (ETag mismatch)
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETag"
       content:
         application/problem+json:
           schema:

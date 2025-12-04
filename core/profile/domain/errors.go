@@ -7,4 +7,5 @@ var (
 	ErrInvalidData      = errors.New("invalid data provided for profile operations")
 	ErrUnhandled        = errors.New("unexpected error")
 	ErrProfileNotFound  = errors.New("profile not found")
+	ErrPrecondition     = errors.New("precondition failed")
 )

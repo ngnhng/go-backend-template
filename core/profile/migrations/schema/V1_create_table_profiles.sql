@@ -16,11 +16,18 @@ CREATE EXTENSION citext;
 
 CREATE TABLE profiles (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
+    version_number BIGINT NOT NULL,
+
     username TEXT,
-    email CITEXT UNIQUE NOT NULL CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
+    email CITEXT UNIQUE NOT NULL,
     age INTEGER,
+
     created_at TIMESTAMPTZ DEFAULT current_timestamp,
+    updated_at TIMESTAMPTZ, -- application-managed
     deleted_at TIMESTAMPTZ,
 
+    CONSTRAINT chk_valid_email CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
     CONSTRAINT chk_valid_age CHECK (age >= 1 AND age <= 150)
 );
+
+COMMENT ON COLUMN profiles.version_number IS 'Optimistic version control';

@@ -18,8 +18,8 @@ import (
 	"io/fs"
 	"net/http"
 
-	profile_api "app/api/profileapi/stdlib"
-	profile_http "app/core/profile/adapters/http"
+	profile_http "app/core/profile/adapters/rest"
+	profile_api "app/modules/api/profileapi/stdlib"
 )
 
 // ProfileAPIService encapsulates the registration logic for the Profile API.

@@ -12,30 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package services
+package http
 
 import (
-	"net/http"
+	"context"
 
-	paymentapi "app/api/paymentapi/stdlib"
+	api "app/modules/api/profileapi/stdlib"
 )
 
-// PaymentAPIService encapsulates registration for the Payment API.
-type PaymentAPIService struct {
-	handler paymentapi.ServerInterface
-}
-
-func NewPaymentAPIService(h paymentapi.ServerInterface) *PaymentAPIService {
-	return &PaymentAPIService{handler: h}
-}
-
-func (s *PaymentAPIService) Register(mux *http.ServeMux) {
-	if s.handler == nil {
-		return
-	}
-	paymentapi.HandlerFromMux(s.handler, mux)
-}
-
-func (s *PaymentAPIService) Middlewares() []func(http.Handler) http.Handler {
-	return nil
+// Healthz returns 204 to indicate the service is healthy.
+func (p *ProfileAPI) Healthz(ctx context.Context, request api.HealthzRequestObject) (api.HealthzResponseObject, error) {
+	return api.Healthz204Response{}, nil
 }

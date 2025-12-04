@@ -8,3 +8,6 @@ gen:
 check:
 	$(GEN)
 	$(CHECK)
+
+build:
+	go build ./...

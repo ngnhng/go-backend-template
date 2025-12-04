@@ -3,10 +3,10 @@ WORKDIR /app
 COPY . .
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags="-w -s" -o /app/server .
+    go build -ldflags="-w -s" -o /app/modules/server .
 
 FROM gcr.io/distroless/static-debian12
 USER nonroot:nonroot
-COPY --from=builder /app/server /server
+COPY --from=builder /app/modules/server /server
 EXPOSE 8080
 ENTRYPOINT ["/server"]
