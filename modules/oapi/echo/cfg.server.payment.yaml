@@ -16,7 +16,7 @@ package: echo_payment_api
 generate:
   models: true
   echo-server: true
-output: api/paymentapi/echo/server.gen.go
+output: modules/api/paymentapi/echo/server.gen.go
 
 # Optional: filter which parts of the spec to generate
 # filter:

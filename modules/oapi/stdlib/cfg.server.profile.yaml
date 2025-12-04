@@ -17,7 +17,7 @@ generate:
   models: true
   std-http-server: true
   strict-server: true
-output: api/profileapi/stdlib/server.gen.go
+output: modules/api/profileapi/stdlib/server.gen.go
 
 # Optional: filter which parts of the spec to generate
 # filter:

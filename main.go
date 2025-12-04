@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate go tool oapi-codegen -config oapi/stdlib/cfg.server.profile.yaml oapi/profile-api-spec.yaml
-//go:generate go tool oapi-codegen -config oapi/stdlib/cfg.server.payment.yaml oapi/payment-api-spec.yaml
-//go:generate go tool oapi-codegen -config oapi/echo/cfg.server.profile.yaml oapi/profile-api-spec.yaml
-//go:generate go tool oapi-codegen -config oapi/echo/cfg.server.payment.yaml oapi/payment-api-spec.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.profile.yaml modules/oapi/profile-api-spec.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.payment.yaml modules/oapi/payment-api-spec.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.profile.yaml modules/oapi/profile-api-spec.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.payment.yaml modules/oapi/payment-api-spec.yaml
 package main
 
 import (

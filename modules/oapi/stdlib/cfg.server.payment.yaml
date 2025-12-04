@@ -16,7 +16,7 @@ package: payment_api
 generate:
   models: true
   std-http-server: true
-output: api/paymentapi/stdlib/server.gen.go
+output: modules/api/paymentapi/stdlib/server.gen.go
 
 # Optional: filter which parts of the spec to generate
 # filter:
