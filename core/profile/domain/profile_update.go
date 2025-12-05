@@ -2,13 +2,10 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/jmoiron/sqlx"
 )
 
 type UpdateProfileParams struct {
@@ -23,8 +20,8 @@ func (app *Application) UpdateProfile(ctx context.Context, p *UpdateProfileParam
 		return nil, ErrInvalidData
 	}
 	var updated *Profile
-	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		profile, err := app.persistence.UpdateProfile(ctx, tx, p)
+	err := app.writer.WithTx(ctx, func(ctx context.Context, tx ProfileWriteTx) error {
+		profile, err := tx.UpdateProfile(ctx, p)
 		if err != nil {
 			return err
 		}
@@ -34,7 +31,7 @@ func (app *Application) UpdateProfile(ctx context.Context, p *UpdateProfileParam
 	if err == nil {
 		return updated, nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrProfileNotFound) {
 		return nil, ErrPrecondition
 	}
 	if errors.Is(err, ErrDuplicateProfile) {
@@ -56,8 +53,8 @@ func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, version
 		return nil, ErrInvalidData
 	}
 	var updated *Profile
-	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		p, err := app.persistence.ModifyProfile(ctx, tx, id, version, nameSet, nameNull, nameVal, ageSet, ageNull, ageVal, emailSet, emailVal)
+	err := app.writer.WithTx(ctx, func(ctx context.Context, tx ProfileWriteTx) error {
+		p, err := tx.ModifyProfile(ctx, id, version, nameSet, nameNull, nameVal, ageSet, ageNull, ageVal, emailSet, emailVal)
 		if err != nil {
 			return err
 		}
@@ -67,7 +64,7 @@ func (app *Application) ModifyProfile(ctx context.Context, id uuid.UUID, version
 	if err == nil {
 		return updated, nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrProfileNotFound) {
 		return nil, ErrPrecondition
 	}
 	if errors.Is(err, ErrDuplicateProfile) {

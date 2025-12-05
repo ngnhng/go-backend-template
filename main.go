@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.profile.yaml modules/oapi/profile-api-spec.yaml
-//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.payment.yaml modules/oapi/payment-api-spec.yaml
-//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.profile.yaml modules/oapi/profile-api-spec.yaml
-//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.payment.yaml modules/oapi/payment-api-spec.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.profile.yaml modules/oapi/openapi-profile.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/stdlib/cfg.server.payment.yaml modules/oapi/openapi-payment.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.profile.yaml modules/oapi/openapi-profile.yaml
+//go:generate go tool oapi-codegen -config modules/oapi/echo/cfg.server.payment.yaml modules/oapi/openapi-payment.yaml
 package main
 
 import (
@@ -44,7 +44,7 @@ import (
 // OpenAPI specs for request validation at runtime
 //
 //go:embed modules/oapi/*.yaml
-var specFS embed.FS
+var validationSpecFS embed.FS
 
 func main() {
 	exitCode := 0
@@ -63,25 +63,36 @@ func main() {
 
 	// --- infrastructure ---
 
-	postgresDBConfig, err := env.ParseAs[postgres.PostgresConnectionConfig]()
+	postgresEnvar, err := env.ParseAs[postgres.PostgresConnectionConfig]()
 	if err != nil {
 		slog.ErrorContext(ctx, "config error", slog.Any("error", err))
 		exitCode = 1
 		return
 	}
-	postgresConnectionPool, err := postgres.New(ctx, &postgresDBConfig)
+	connectionPool, err := postgres.New(
+		ctx,
+		&postgresEnvar,
+		postgres.PostgresOptions{
+			// assuming writer connection does not pass through pgBouncer,
+			// so we can apply server-side prepared statements
+			ReaderOptions: []postgres.PgxConfigOption{
+				postgres.WithPgBouncerSimpleProtocol(),
+			},
+		},
+	)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error", slog.Any("error", err))
 		exitCode = 1
 		return
 	}
 	defer func() {
-		if err := postgresConnectionPool.Shutdown(ctx); err != nil {
+		if err := connectionPool.Shutdown(ctx); err != nil {
 			slog.ErrorContext(ctx, "database shutdown error", slog.Any("error", err))
 		}
 	}()
 
-	if err = postgresConnectionPool.HealthCheck(); err != nil {
+	// Should be a separate goroutine
+	if err = connectionPool.HealthCheck(); err != nil {
 		slog.ErrorContext(ctx, "database health check failed", slog.Any("error", err))
 		exitCode = 1
 		return
@@ -100,8 +111,14 @@ func main() {
 		return
 	}
 
-	postgresProfilePersistence := &persistence.PostgresProfilePersistence{
-		TableName: "profiles",
+	// Initialize reader (uses runtime replica selection) and writer (uses prepared statements on primary)
+	reader := persistence.NewPostgresProfileReader(connectionPool, "profiles")
+
+	writer, err := persistence.NewPostgresProfileWriter(ctx, connectionPool.Primary(), "profiles")
+	if err != nil {
+		slog.ErrorContext(ctx, "profile writer initialization error", slog.Any("error", err))
+		exitCode = 1
+		return
 	}
 
 	telemetryConfig, err := env.ParseAs[telemetry.Config]()
@@ -125,7 +142,7 @@ func main() {
 	// --- application layer ---
 
 	profileApi := profile_http.NewProfileService(
-		postgresConnectionPool, postgresProfilePersistence, signer)
+		reader, writer, signer)
 
 	// Initialize HTTP metrics for middleware-based instrumentation
 	httpMetrics, err := telemetry.NewHTTPMetrics("profile-api")
@@ -136,7 +153,7 @@ func main() {
 
 	profileSvc := services.NewProfileAPIService(
 		profileApi,
-		specFS,
+		validationSpecFS,
 		"oapi/profile-api-spec.yaml",
 	)
 

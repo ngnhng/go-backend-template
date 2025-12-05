@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
-
-	"github.com/jmoiron/sqlx"
 )
 
 func (app *Application) CreateProfile(ctx context.Context, username, email string) (*Profile, error) {
@@ -16,8 +13,8 @@ func (app *Application) CreateProfile(ctx context.Context, username, email strin
 		return nil, ErrInvalidData
 	}
 	var created *Profile
-	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		p, err := app.persistence.CreateProfile(ctx, tx, username, email)
+	err := app.writer.WithTx(ctx, func(ctx context.Context, tx ProfileWriteTx) error {
+		p, err := tx.CreateProfile(ctx, username, email)
 		if err != nil {
 			return err
 		}

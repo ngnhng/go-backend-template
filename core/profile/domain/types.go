@@ -4,16 +4,14 @@ import (
 	"strconv"
 	"time"
 
-	"app/modules/db"
-
 	"github.com/gofrs/uuid/v5"
 )
 
 type (
 	Application struct {
-		pool        db.ConnectionPool
-		persistence ProfilePersistence
-		signer      CursorSigner
+		reader ProfileReadStore
+		writer ProfileWriteStore
+		signer CursorSigner
 	}
 
 	// Profile is the domain model used by the application layer.

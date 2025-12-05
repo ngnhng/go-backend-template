@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ func newResponseRecorder(w http.ResponseWriter) *responseRecorder {
 	}
 }
 
+// WriteHeader implements http.ResponseWriter
 func (r *responseRecorder) WriteHeader(code int) {
 	if !r.wroteHeader {
 		r.statusCode = code
@@ -45,6 +46,7 @@ func (r *responseRecorder) WriteHeader(code int) {
 	}
 }
 
+// Write implements http.ResponseWriter
 func (r *responseRecorder) Write(b []byte) (int, error) {
 	// If WriteHeader hasn't been called yet, Write will implicitly call it with 200
 	if !r.wroteHeader {

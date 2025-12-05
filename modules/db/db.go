@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,16 +18,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/stephenafamo/bob"
 )
 
 type (
+	TxFn func(ctx context.Context, q Querier) error
 
 	// Querier is an interface for database queries
+	// Uses bob.Executor so both bob.DB and bob.Tx conform
 	Querier interface {
-		// Use sqlx.ExtContext so both *sqlx.DB and *sqlx.Tx conform
-		// TODO: Prepare and reuse statements
-		sqlx.ExtContext
+		bob.Executor
 	}
 
 	// OLTP SQL compliant database connection pool
@@ -51,18 +51,19 @@ type (
 	ConnectionManager interface {
 		// Writer returns a writer (primary) database connection
 		// from the underlying database connection pool
-		//
-		// Note: Use *sqlx.Conn only when we need to pin a
-		// series of statements to the same physical
-		// connection without starting a transaction
-		Writer() *sqlx.DB
+		// TODO: multiple writers
+		Writer() Querier
 
+		ReaderConnectionManager
+	}
+
+	ReaderConnectionManager interface {
 		// Reader returns a read replica database connection
 		// from the underlying database connection pool
 		//
 		// Should fallback to a writer connection if not
 		// available
-		Reader() *sqlx.DB
+		Reader() Querier
 	}
 
 	MigrationManager interface {
@@ -72,12 +73,12 @@ type (
 	}
 
 	TxManager interface {
-		WithTx(context.Context, func(context.Context, *sqlx.Tx) error) error
-		WithTimeoutTx(context.Context, time.Duration, func(context.Context, *sqlx.Tx) error) error
+		WithTx(ctx context.Context, fn TxFn) error
+		WithTimeoutTx(ctx context.Context, timeout time.Duration, fn TxFn) error
 	}
 
 	KV interface {
-		TxGet(context.Context, string) (any, error)
-		TxSet(context.Context, string, any) (any, error)
+		AtomicGet(context.Context, string) (any, error)
+		AtomicSet(context.Context, string, any) (any, error)
 	}
 )

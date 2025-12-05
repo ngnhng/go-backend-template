@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 
@@ -13,11 +12,11 @@ func (app *Application) GetProfileByID(ctx context.Context, id uuid.UUID) (*Prof
 	if id.IsNil() {
 		return nil, ErrInvalidData
 	}
-	prof, err := app.persistence.GetProfileByID(ctx, app.pool.Reader(), id)
+	prof, err := app.reader.GetProfileByID(ctx, id)
 	if err == nil {
 		return prof, nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrProfileNotFound) {
 		return nil, ErrProfileNotFound
 	}
 	slog.ErrorContext(ctx, "unexpected error", slog.Any("error", err))

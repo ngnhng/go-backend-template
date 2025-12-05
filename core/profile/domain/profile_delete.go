@@ -2,26 +2,23 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/jmoiron/sqlx"
 )
 
 func (app *Application) DeleteProfile(ctx context.Context, id uuid.UUID, version int64) error {
 	if id.IsNil() || version < 0 {
 		return ErrInvalidData
 	}
-	err := app.pool.WithTimeoutTx(ctx, 1*time.Second, func(ctx context.Context, tx *sqlx.Tx) error {
-		return app.persistence.DeleteProfile(ctx, tx, id, version)
+	err := app.writer.WithTx(ctx, func(ctx context.Context, tx ProfileWriteTx) error {
+		return tx.DeleteProfile(ctx, id, version)
 	})
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrProfileNotFound) {
 		return ErrPrecondition
 	}
 	if errors.Is(err, ErrInvalidData) {

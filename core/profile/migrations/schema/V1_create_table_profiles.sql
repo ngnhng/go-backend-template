@@ -1,4 +1,4 @@
--- Copyright 2025 Nguyen Nhat Nguyen
+-- Copyright 2025 Nhat-Nguyen Nguyen
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -16,18 +16,19 @@ CREATE EXTENSION citext;
 
 CREATE TABLE profiles (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
-    version_number BIGINT NOT NULL,
+    version_number BIGINT NOT NULL DEFAULT 0,
 
     username TEXT,
     email CITEXT UNIQUE NOT NULL,
     age INTEGER,
 
-    created_at TIMESTAMPTZ DEFAULT current_timestamp,
-    updated_at TIMESTAMPTZ, -- application-managed
+    created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
     deleted_at TIMESTAMPTZ,
 
     CONSTRAINT chk_valid_email CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
     CONSTRAINT chk_valid_age CHECK (age >= 1 AND age <= 150)
 );
 
+COMMENT ON COLUMN profiles.updated_at IS 'Application-managed';
 COMMENT ON COLUMN profiles.version_number IS 'Optimistic version control';

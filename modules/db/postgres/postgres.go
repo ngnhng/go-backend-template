@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
+	"github.com/stephenafamo/bob"
 
 	_ "github.com/amacneil/dbmate/v2/pkg/dbmate"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/postgres"
@@ -41,9 +41,9 @@ var _ db.ConnectionPool = (*PostgresConnectionPool)(nil)
 
 type (
 	PostgresConnectionPool struct {
-		writer *sqlx.DB
+		writer bob.DB
 
-		readers []*sqlx.DB
+		readers []bob.DB
 		mu      sync.Mutex
 
 		// TODO: partitioning config
@@ -73,13 +73,8 @@ func (p *PostgresConnectionPool) GenerateMigration() error {
 // HealthCheck implements db.ConnectionPool.
 func (p *PostgresConnectionPool) HealthCheck() error {
 	ctx := context.Background()
-	conn, err := p.writer.Connx(ctx)
-	if err != nil {
-		return err
-	}
-
 	// TODO: Make this query configurable
-	_, err = conn.ExecContext(ctx, "SELECT 1")
+	_, err := p.writer.ExecContext(ctx, "SELECT 1")
 	return err
 }
 
@@ -103,7 +98,7 @@ func (p *PostgresConnectionPool) MigrateUp() error {
 //
 // Without any profiling/edge cases to justify implementing the more complex
 // choices, here we first use a simpler approach first
-func (p *PostgresConnectionPool) Reader() *sqlx.DB {
+func (p *PostgresConnectionPool) Reader() db.Querier {
 	if len(p.readers) == 0 {
 		return p.Writer()
 	}
@@ -115,62 +110,22 @@ func (p *PostgresConnectionPool) Reader() *sqlx.DB {
 }
 
 // WithTimeoutTx implements db.ConnectionPool.
-func (p *PostgresConnectionPool) WithTimeoutTx(ctx context.Context, timeout time.Duration, fn func(context.Context, *sqlx.Tx) error) error {
+func (p *PostgresConnectionPool) WithTimeoutTx(ctx context.Context, timeout time.Duration, fn db.TxFn) error {
 	ctx, stop := context.WithTimeout(ctx, timeout)
 	defer stop()
 
-	// TODO: make isolation level configurable
-	tx, err := p.writer.BeginTxx(ctx, &sql.TxOptions{
-		ReadOnly: false,
-	})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		}
-	}()
-
-	if err = fn(ctx, tx); err != nil {
-		rbErr := tx.Rollback()
-		if rbErr != nil && rbErr != sql.ErrTxDone {
-			return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
-		}
-		return err
-	}
-
-	return tx.Commit()
+	return p.WithTx(ctx, fn)
 }
 
 // WithTx implements db.ConnectionPool.
-func (p *PostgresConnectionPool) WithTx(ctx context.Context, fn func(context.Context, *sqlx.Tx) error) error {
+func (p *PostgresConnectionPool) WithTx(ctx context.Context, fn db.TxFn) error {
 	// TODO: make isolation level configurable
-	tx, err := p.writer.BeginTxx(ctx, &sql.TxOptions{
+	return p.writer.RunInTx(ctx, &sql.TxOptions{
 		ReadOnly: false,
+	}, func(ctx context.Context, exec bob.Executor) error {
+		// exec implements bob.Executor, which satisfies our db.Querier
+		return fn(ctx, exec)
 	})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		}
-	}()
-
-	if err = fn(ctx, tx); err != nil {
-		rbErr := tx.Rollback()
-		if rbErr != nil && rbErr != sql.ErrTxDone {
-			return fmt.Errorf("rollback failed after error: %v: %w", err, rbErr)
-		}
-		return err
-	}
-
-	return tx.Commit()
 }
 
 // Shutdown implements db.ConnectionPool.
@@ -181,16 +136,11 @@ func (p *PostgresConnectionPool) Shutdown(_ context.Context) error {
 
 	var errs []error
 
-	if p.writer != nil {
-		if err := p.writer.Close(); err != nil {
-			errs = append(errs, err)
-		}
+	if err := p.writer.Close(); err != nil {
+		errs = append(errs, err)
 	}
 
 	for _, reader := range p.readers {
-		if reader == nil {
-			continue
-		}
 		if err := reader.Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -208,8 +158,27 @@ func (p *PostgresConnectionPool) Shutdown(_ context.Context) error {
 }
 
 // Writer implements db.ConnectionPool.
-func (p *PostgresConnectionPool) Writer() *sqlx.DB {
+func (p *PostgresConnectionPool) Writer() db.Querier {
 	return p.writer
+}
+
+// Primary returns the primary (writer) bob.DB instance.
+// This is used for preparing write statements.
+func (p *PostgresConnectionPool) Primary() *bob.DB {
+	return &p.writer
+}
+
+// Replica returns a random replica bob.DB instance, or the primary if no replicas exist.
+// This is used for preparing read statements.
+func (p *PostgresConnectionPool) Replica() *bob.DB {
+	if len(p.readers) == 0 {
+		return &p.writer
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return &p.readers[rand.IntN(len(p.readers))]
 }
 
 // Example:
@@ -219,15 +188,19 @@ func connString(cfg *PoolConfig) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?pool_max_conns=%v", cfg.User, cfg.Password, cfg.Host, strconv.Itoa(int(cfg.Port)), cfg.Database, cfg.PoolMaxConns)
 }
 
-func New(ctx context.Context, config *PostgresConnectionConfig) (*PostgresConnectionPool, error) {
-	writer, err := initDBFromConfig(ctx, &config.WriteConfig)
+func New(
+	ctx context.Context,
+	config *PostgresConnectionConfig,
+	opts PostgresOptions,
+) (*PostgresConnectionPool, error) {
+	writer, err := initDBFromConfig(ctx, &config.WriteConfig, opts.WriterOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	var readers []*sqlx.DB
+	var readers []bob.DB
 	for _, r := range config.ReadConfigs {
-		reader, err := initDBFromConfig(ctx, &r)
+		reader, err := initDBFromConfig(ctx, &r, opts.ReaderOptions...)
 		if err != nil {
 			// TODO: continue or abort?
 			return nil, err
@@ -241,14 +214,25 @@ func New(ctx context.Context, config *PostgresConnectionConfig) (*PostgresConnec
 	}, nil
 }
 
-func initDBFromConfig(ctx context.Context, config *PoolConfig) (*sqlx.DB, error) {
+func initDBFromConfig(
+	ctx context.Context,
+	config *PoolConfig,
+	opts ...PgxConfigOption,
+) (bob.DB, error) {
 	poolConfig, err := pgxpool.ParseConfig(connString(config))
 	if err != nil {
-		return nil, err
+		return bob.DB{}, err
 	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(poolConfig)
+		}
+	}
+
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
-		return nil, err
+		return bob.DB{}, err
 	}
-	return sqlx.NewDb(stdlib.OpenDBFromPool(pool), "pgx"), nil
+	return bob.NewDB(stdlib.OpenDBFromPool(pool)), nil
 }

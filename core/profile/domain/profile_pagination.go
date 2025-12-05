@@ -12,7 +12,7 @@ func (app *Application) GetProfilesByOffset(ctx context.Context, page int, pageS
 		return nil, 0, ErrInvalidData
 	}
 	offset := page * pageSize
-	profiles, count, err := app.persistence.GetProfilesByOffset(ctx, app.pool.Reader(), pageSize, offset)
+	profiles, count, err := app.reader.GetProfilesByOffset(ctx, pageSize, offset)
 	if err != nil {
 		slog.ErrorContext(ctx, "persistence error", slog.Any("error", err))
 		return nil, 0, err
@@ -31,7 +31,7 @@ func (app *Application) GetProfilesByCursor(ctx context.Context, rawCursor strin
 		return nil, "", ErrInvalidData
 	}
 
-	profiles, err := app.persistence.GetProfilesByCursor(ctx, app.pool.Reader(), tok.Pivot.CreatedAt, tok.Pivot.ID, tok.Direction, limit)
+	profiles, err := app.reader.GetProfilesByCursor(ctx, tok.Pivot.CreatedAt, tok.Pivot.ID, tok.Direction, limit)
 	if err != nil {
 		slog.ErrorContext(ctx, "persistence error", slog.Any("error", err))
 		return nil, "", err
@@ -96,5 +96,5 @@ func (app *Application) GetProfilesFirstPage(ctx context.Context, limit int) ([]
 	if limit <= 0 {
 		return nil, ErrInvalidData
 	}
-	return app.persistence.GetProfilesFirstPage(ctx, app.pool.Reader(), limit)
+	return app.reader.GetProfilesFirstPage(ctx, limit)
 }

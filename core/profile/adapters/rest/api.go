@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package http
 import (
 	"app/core/profile/domain"
 	api "app/modules/api/profileapi/stdlib"
-	"app/modules/db"
 )
 
 // ProfileAPI implements the HTTP API handlers for profile operations.
@@ -28,9 +27,9 @@ type ProfileAPI struct {
 }
 
 // NewProfileService creates a new ProfileAPI instance with all dependencies.
-func NewProfileService(pool db.ConnectionPool, persistence domain.ProfilePersistence, signer domain.CursorSigner) *ProfileAPI {
+func NewProfileService(reader domain.ProfileReadStore, writer domain.ProfileWriteStore, signer domain.CursorSigner) *ProfileAPI {
 	return &ProfileAPI{
-		app: domain.NewApp(pool, persistence, signer),
+		app: domain.NewApp(reader, writer, signer),
 	}
 }
 

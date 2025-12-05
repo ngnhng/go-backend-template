@@ -1,4 +1,4 @@
-// Copyright 2025 Nguyen Nhat Nguyen
+// Copyright 2025 Nhat-Nguyen Nguyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@ import (
 
 	profile_http "app/core/profile/adapters/rest"
 	profile_api "app/modules/api/profileapi/stdlib"
+	"app/modules/server"
 )
+
+var _ server.RegistrableService = (*ProfileAPIService)(nil)
 
 // ProfileAPIService encapsulates the registration logic for the Profile API.
 type ProfileAPIService struct {
