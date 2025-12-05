@@ -8,7 +8,6 @@ require (
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/jmoiron/sqlx v1.4.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/nullable v1.1.0
