@@ -28,6 +28,7 @@ import (
 )
 
 // TODO: CAS/WATCH based flows
+// TODO: sentinel
 
 // RueidisOptions contains configuration for constructing a rueidis.Client.
 //
