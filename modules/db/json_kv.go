@@ -19,6 +19,7 @@ import (
 	"fmt"
 )
 
+// TODO: may be removed in near future in favor of Transformer generic implementation
 type (
 
 	// JSONKV wraps a db.KV and transparently JSON-encodes/decodes values of type T.

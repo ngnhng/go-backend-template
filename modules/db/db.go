@@ -80,6 +80,8 @@ type (
 		WithTimeoutTx(ctx context.Context, timeout time.Duration, fn TxFn) error
 	}
 
+	// TODO: abstract Transformer logic with generics (KVTransformer)
+	//   func Getx[Tr Transformer[K, V], K, V any]
 	KV interface {
 		AtomicGet(context.Context, string) (any, error)
 		AtomicSet(context.Context, string, any) (any, error)

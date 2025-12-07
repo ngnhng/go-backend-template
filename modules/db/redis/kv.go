@@ -55,7 +55,6 @@ var (
 )
 
 // RedisKV is a Rueidis-backed implementation of db.KV with:
-//
 //   - Key prefixing (multi-tenant / env scoping)
 //   - AtomicSet via Lua (GET + SET + TTL in one script)
 //   - Optional server-assisted client-side caching for reads (AtomicGet)
@@ -155,15 +154,11 @@ func (k *RedisKV) AtomicGet(ctx context.Context, key string) (any, error) {
 }
 
 // AtomicSet implements db.KV.AtomicSet.
-//
 //   - Serializes value (string / []byte / Stringer / JSON)
 //
 // Uses a Lua script to atomically:
-//
 //   - GET previous value
-//
 //   - SET new value (with EX TTL if configured)
-//
 //   - Returns the previous value as []byte or nil if none
 func (r *RedisKV) AtomicSet(ctx context.Context, key string, value any) (any, error) {
 	fullKey := r.key(key)
