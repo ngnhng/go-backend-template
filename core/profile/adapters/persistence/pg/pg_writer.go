@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package persistence
+package pg
 
 import (
-	"app/core/profile/domain"
 	"context"
 	"fmt"
+	"time"
+
+	"app/core/profile/domain"
+	"app/modules/db"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/stephenafamo/bob"
@@ -32,7 +35,8 @@ var _ domain.ProfileWriteStore = (*PostgresProfileWriter)(nil)
 type (
 	PostgresProfileWriter struct {
 		table string
-		db    *bob.DB // primary
+		db    *bob.DB // for prepared statements on primary
+		txm   db.TxManager
 
 		createStmt bob.QueryStmt[createProfileArgs, ProfileRow, []ProfileRow]
 		updateStmt bob.QueryStmt[updateProfileArgs, ProfileRow, []ProfileRow]
@@ -46,10 +50,10 @@ type (
 	}
 
 	updateProfileArgs struct {
-		ID      uuid.UUID `db:"id"`
-		Username string   `db:"username"`
-		Email    string   `db:"email"`
-		Version int64     `db:"version_number"`
+		ID       uuid.UUID `db:"id"`
+		Username string    `db:"username"`
+		Email    string    `db:"email"`
+		Version  int64     `db:"version_number"`
 	}
 
 	deleteProfileArgs struct {
@@ -58,11 +62,16 @@ type (
 	}
 )
 
+var _ bob.Executor = (*bob.DB)(nil)
+
 // NewPostgresProfileWriter creates a new writer with prepared statements bound to the primary.
-func NewPostgresProfileWriter(ctx context.Context, primary *bob.DB, table string) (*PostgresProfileWriter, error) {
+func NewPostgresProfileWriter(ctx context.Context, pool db.ConnectionPool, table string) (*PostgresProfileWriter, error) {
+	primary := pool.Writer().(*bob.DB)
+
 	w := &PostgresProfileWriter{
 		table: table,
 		db:    primary,
+		txm:   pool,
 	}
 
 	// INSERT INTO ... RETURNING ...
@@ -221,11 +230,32 @@ func (w *PostgresProfileWriter) WithTx(
 	ctx context.Context,
 	fn func(ctx context.Context, txTx domain.ProfileWriteTx) error,
 ) error {
-	return w.db.RunInTx(ctx, nil, func(ctx context.Context, exec bob.Executor) error {
-		tx, ok := exec.(bob.Tx)
+	return w.txm.WithTx(ctx, func(ctx context.Context, q db.Querier) error {
+		tx, ok := q.(bob.Tx)
 		if !ok {
-			return fmt.Errorf("executor is not a transaction")
+			return fmt.Errorf("querier is not a transaction")
 		}
+
+		txRepo := &profileWriterTx{
+			parent: w,
+			tx:     tx,
+		}
+		return fn(ctx, txRepo)
+	})
+}
+
+// WithTimeoutTx implements ProfileWriteStore transaction support with timeout.
+func (w *PostgresProfileWriter) WithTimeoutTx(
+	ctx context.Context,
+	timeout time.Duration,
+	fn func(ctx context.Context, txTx domain.ProfileWriteTx) error,
+) error {
+	return w.txm.WithTimeoutTx(ctx, timeout, func(ctx context.Context, q db.Querier) error {
+		tx, ok := q.(bob.Tx)
+		if !ok {
+			return fmt.Errorf("querier is not a transaction")
+		}
+
 		txRepo := &profileWriterTx{
 			parent: w,
 			tx:     tx,
@@ -241,19 +271,6 @@ type profileWriterTx struct {
 }
 
 var _ domain.ProfileWriteTx = (*profileWriterTx)(nil)
-
-// inTxQueryStmt rebinds a QueryStmt to a transaction.
-func inTxQueryStmt[Arg any, T any, Ts ~[]T](
-	ctx context.Context,
-	stmt bob.QueryStmt[Arg, T, Ts],
-	tx bob.Tx,
-) bob.QueryStmt[Arg, T, Ts] {
-	// Copy the original
-	txStmt := stmt
-	// Rebind inner Stmt to the transaction
-	txStmt.Stmt = bob.InTx(ctx, stmt.Stmt, tx)
-	return txStmt
-}
 
 func (t *profileWriterTx) CreateProfile(ctx context.Context, username, email string) (*domain.Profile, error) {
 	stmt := inTxQueryStmt(ctx, t.parent.createStmt, t.tx)

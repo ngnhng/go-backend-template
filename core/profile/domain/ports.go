@@ -20,6 +20,8 @@ import (
 //   - Queries should use prepared statements where possible for performance
 //   - All methods are read-only and should never modify data
 //   - No transaction support needed (reads don't require atomicity across operations)
+//
+// TODO: ProfileReadTx?
 type ProfileReadStore interface {
 	// GetProfilesByCursor implements cursor-based pagination using a keyset approach.
 	// The cursor contains a pivot point (created_at, id) and direction (ASC/DESC).
@@ -170,6 +172,8 @@ type ProfileWriteStore interface {
 	// Important: Do NOT nest WithTx calls - the ProfileWriteTx interface
 	// intentionally does not expose WithTx to prevent nested transactions.
 	WithTx(ctx context.Context, fn func(ctx context.Context, tx ProfileWriteTx) error) error
+	// WithTimeoutTx is the same as WithTx but applies a context timeout before starting the transaction.
+	WithTimeoutTx(ctx context.Context, timeout time.Duration, fn func(ctx context.Context, tx ProfileWriteTx) error) error
 }
 
 // ProfileWriteTx is a transaction-scoped version of ProfileWriteStore.

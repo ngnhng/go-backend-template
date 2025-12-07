@@ -26,6 +26,8 @@ type (
 
 	// Querier is an interface for database queries
 	// Uses bob.Executor so both bob.DB and bob.Tx conform
+	//
+	// TODO: consider for removal
 	Querier interface {
 		bob.Executor
 	}
@@ -51,6 +53,7 @@ type (
 	ConnectionManager interface {
 		// Writer returns a writer (primary) database connection
 		// from the underlying database connection pool
+		//
 		// TODO: multiple writers
 		Writer() Querier
 

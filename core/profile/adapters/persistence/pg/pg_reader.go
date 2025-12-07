@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package persistence
+package pg
 
 import (
 	"context"
@@ -33,9 +33,10 @@ import (
 var _ domain.ProfileReadStore = (*PostgresProfileReader)(nil)
 
 type (
+	// TODO: read-ony transaction
 	PostgresProfileReader struct {
 		table string
-		pool  db.ReaderConnectionManager // calls Reader() at runtime
+		pool  db.ReaderConnectionManager
 	}
 )
 

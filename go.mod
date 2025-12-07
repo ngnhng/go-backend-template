@@ -12,7 +12,8 @@ require (
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/nullable v1.1.0
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/redis/rueidis v1.0.68
+	github.com/redis/rueidis v1.0.69
+	github.com/redis/rueidis/rueidisotel v1.0.69
 	github.com/stephenafamo/bob v0.42.0
 	github.com/stephenafamo/scan v0.7.0
 	go.opentelemetry.io/otel v1.38.0

@@ -36,7 +36,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
-	"app/core/profile/adapters/persistence"
+	persistence "app/core/profile/adapters/persistence/pg"
 
 	profile_http "app/core/profile/adapters/rest"
 )
@@ -114,7 +114,7 @@ func main() {
 	// Initialize reader (uses runtime replica selection) and writer (uses prepared statements on primary)
 	reader := persistence.NewPostgresProfileReader(connectionPool, "profiles")
 
-	writer, err := persistence.NewPostgresProfileWriter(ctx, connectionPool.Primary(), "profiles")
+	writer, err := persistence.NewPostgresProfileWriter(ctx, connectionPool, "profiles")
 	if err != nil {
 		slog.ErrorContext(ctx, "profile writer initialization error", slog.Any("error", err))
 		exitCode = 1

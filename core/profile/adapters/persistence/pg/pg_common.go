@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package persistence
+package pg
 
 import (
-	"app/core/profile/domain"
+	"context"
 	"database/sql"
 	"errors"
 	"time"
 
+	"app/core/profile/domain"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stephenafamo/bob"
 )
 
 type (
@@ -83,4 +86,17 @@ func wrapProfileError(err error) error {
 	}
 
 	return err
+}
+
+// inTxQueryStmt rebinds a QueryStmt to a transaction.
+func inTxQueryStmt[Arg any, T any, Ts ~[]T](
+	ctx context.Context,
+	stmt bob.QueryStmt[Arg, T, Ts],
+	tx bob.Tx,
+) bob.QueryStmt[Arg, T, Ts] {
+	// Copy the original
+	txStmt := stmt
+	// Rebind inner Stmt to the transaction
+	txStmt.Stmt = bob.InTx(ctx, stmt.Stmt, tx)
+	return txStmt
 }

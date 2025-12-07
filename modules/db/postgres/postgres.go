@@ -91,7 +91,7 @@ func (p *PostgresConnectionPool) MigrateUp() error {
 // Reader implements db.ConnectionPool.
 //
 // Many strategies exist for selecting one reader from the list:
-// - Health-aware selection (cooldown & circuit breakers)
+// - Health-aware selection (cool-down & circuit breakers)
 // - Power of two choices
 // - Retry policy
 // - Read-your-write
