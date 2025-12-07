@@ -11,14 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package redis
+package db
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"app/modules/db"
 )
 
 type (
@@ -32,12 +30,12 @@ type (
 	//   prev, _ := jsonKV.Set(ctx, "user:123", profile)
 	//   curr, _ := jsonKV.Get(ctx, "user:123")
 	JSONKV[T any] struct {
-		KV db.KV
+		KV
 	}
 )
 
 // NewJSONKV constructs a JSONKV wrapper on top of an existing db.KV.
-func NewJSONKV[T any](kv db.KV) JSONKV[T] {
+func NewJSONKV[T any](kv KV) JSONKV[T] {
 	return JSONKV[T]{KV: kv}
 }
 
