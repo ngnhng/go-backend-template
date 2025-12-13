@@ -66,11 +66,11 @@ var _ bob.Executor = (*bob.DB)(nil)
 
 // NewPostgresProfileWriter creates a new writer with prepared statements bound to the primary.
 func NewPostgresProfileWriter(ctx context.Context, pool db.ConnectionPool, table string) (*PostgresProfileWriter, error) {
-	primary := pool.Writer().(*bob.DB)
+	primary := pool.Writer().(bob.DB)
 
 	w := &PostgresProfileWriter{
 		table: table,
-		db:    primary,
+		db:    &primary,
 		txm:   pool,
 	}
 
@@ -78,8 +78,8 @@ func NewPostgresProfileWriter(ctx context.Context, pool db.ConnectionPool, table
 	insertQuery := psql.Insert(
 		im.Into(table, "username", "email"),
 		im.Values(
-			psql.Arg(bob.Named("username")),
-			psql.Arg(bob.Named("email")),
+			bob.Named("username"),
+			bob.Named("email"),
 		),
 		im.Returning("id", "username", "email", "age", "created_at", "version_number"),
 	)
@@ -93,12 +93,12 @@ func NewPostgresProfileWriter(ctx context.Context, pool db.ConnectionPool, table
 	// UPDATE ... SET username = :username, email = :email, version_number = version_number + 1
 	updateQuery := psql.Update(
 		um.Table(table),
-		um.SetCol("username").To(psql.Arg(bob.Named("username"))),
-		um.SetCol("email").To(psql.Arg(bob.Named("email"))),
+		um.SetCol("username").To(bob.Named("username")),
+		um.SetCol("email").To(bob.Named("email")),
 		um.SetCol("version_number").To(psql.Raw("version_number + 1")),
-		um.Where(psql.Quote("id").EQ(psql.Arg(bob.Named("id")))),
+		um.Where(psql.Quote("id").EQ(bob.Named("id"))),
 		um.Where(psql.Quote("deleted_at").IsNull()),
-		um.Where(psql.Quote("version_number").EQ(psql.Arg(bob.Named("version_number")))),
+		um.Where(psql.Quote("version_number").EQ(bob.Named("version_number"))),
 		um.Returning("id", "username", "email", "age", "created_at", "version_number"),
 	)
 
@@ -113,9 +113,9 @@ func NewPostgresProfileWriter(ctx context.Context, pool db.ConnectionPool, table
 		um.Table(table),
 		um.SetCol("deleted_at").To(psql.Raw("CURRENT_TIMESTAMP")),
 		um.SetCol("version_number").To(psql.Raw("version_number + 1")),
-		um.Where(psql.Quote("id").EQ(psql.Arg(bob.Named("id")))),
+		um.Where(psql.Quote("id").EQ(bob.Named("id"))),
 		um.Where(psql.Quote("deleted_at").IsNull()),
-		um.Where(psql.Quote("version_number").EQ(psql.Arg(bob.Named("version_number")))),
+		um.Where(psql.Quote("version_number").EQ(bob.Named("version_number"))),
 		um.Returning("id"),
 	)
 

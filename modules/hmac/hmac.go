@@ -25,7 +25,7 @@ import (
 // TODO: URL-safe base64 encoding option since we may pass the output onto URLs
 
 type HMACConfig struct {
-	Secret string `env:"HMAC_SECRET,notEmpty"`
+	Secret string `env:"SECRET,notEmpty"`
 }
 
 type HMACSigner struct {

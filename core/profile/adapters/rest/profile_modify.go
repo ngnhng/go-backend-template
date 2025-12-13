@@ -140,5 +140,10 @@ func (p *ProfileAPI) ModifyProfile(ctx context.Context, request api.ModifyProfil
 		}
 	}
 	resp := api.SuccessProfile{Data: mapProfile([]domain.Profile{*updated})[0]}
-	return api.ModifyProfile200JSONResponse(resp), nil
+	return api.ModifyProfile200JSONResponse{
+		Body: resp,
+		Headers: api.ModifyProfile200ResponseHeaders{
+			ETag: etag.ETag(updated),
+		},
+	}, nil
 }

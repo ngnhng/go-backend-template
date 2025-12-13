@@ -22,6 +22,7 @@ volumes:
   vm_data: {}
   vlogs_data: {}
   vt_data: {}
+  valkey_data: {}
 
 networks:
   app:
@@ -67,18 +68,26 @@ services:
       # --- App deps ---
       POSTGRES_PRIMARY_HOST: "postgres-primary"
       POSTGRES_PRIMARY_PORT: "5432"
-      POSTGRES_PRIMARY_DATABASE: "profiledb"
+      POSTGRES_PRIMARY_DATABASE: "postgres"
       POSTGRES_REPLICA_0_HOST: "postgres-replica"
       POSTGRES_REPLICA_0_PORT: "5432"
-      POSTGRES_REPLICA_0_DATABASE: "profiledb"
+      POSTGRES_REPLICA_0_DATABASE: "postgres"
       HMAC_SECRET: "secret"
+      REDIS_URL: "redis://:valkey@valkey:6379/0"
+      RATE_LIMIT_ROUTE_0_PATTERN: "/v1/profiles"
+      RATE_LIMIT_ROUTE_0_POLICY_0_METHOD: "GET"
+      RATE_LIMIT_ROUTE_0_POLICY_0_LIMIT: "100"
+      RATE_LIMIT_ROUTE_0_POLICY_0_WINDOW: "1m"
+      RATE_LIMIT_ROUTE_0_POLICY_0_KEY_STRATEGY: "remote_ip"
+      RATE_LIMIT_ALLOW_IF_NO_MATCH: false
+      RATE_LIMIT_DEFAULT_LIMIT: 10000
+      RATE_LIMIT_DEFAULT_WINDOW: 5m
+      RATE_LIMIT_DEFAULT_KEY_STRATEGY: "remote_ip"
     networks:
       - app
       - observability
     ports:
       - "8080:8080"
-    depends_on:
-      - postgres-primary
     profiles:
       - app
       - all
@@ -121,6 +130,12 @@ services:
       - ./deployment/local/postgres18:/docker-entrypoint-initdb.d
     networks:
       - app
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
     profiles:
       - postgres
       - infra
@@ -171,6 +186,20 @@ services:
       - pg18-replica-data:/var/lib/postgresql
     profiles:
       - postgres
+      - infra
+      - all
+
+  valkey:
+    image: valkey/valkey:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    command: valkey-server --save "" --appendonly no --protected-mode no --requirepass valkey
+    networks:
+      - app
+    profiles:
+      - valkey
       - infra
       - all
 

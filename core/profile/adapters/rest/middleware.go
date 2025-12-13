@@ -21,13 +21,14 @@ import (
 	"net/http"
 
 	"app/modules/middleware"
+	"app/modules/middleware/problem"
 )
 
 // RecoverHTTPMiddleware returns a panic recovery middleware configured for the Profile API.
 func RecoverHTTPMiddleware() func(http.Handler) http.Handler {
 	return middleware.Recovery(func(w http.ResponseWriter, r *http.Request, recovered any) {
 		slog.Error("recover middleware", slog.Any("error", recovered))
-		WriteProblem(w, InternalProblem("server error"))
+		problem.Write(w, problem.Internal("server error"))
 	})
 }
 

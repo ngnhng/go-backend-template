@@ -13,3 +13,5 @@
 // limitations under the License.
 
 package ratelimit
+
+type TokenBucketRateLimiter struct{}

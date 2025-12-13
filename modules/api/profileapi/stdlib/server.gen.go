@@ -964,8 +964,12 @@ type ListProfilesResponseObject interface {
 }
 
 type ListProfiles200ResponseHeaders struct {
-	ETag string
-	Link string
+	ETag                    ETagValue
+	Link                    string
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
 }
 
 type ListProfiles200JSONResponse struct {
@@ -977,6 +981,10 @@ func (response ListProfiles200JSONResponse) VisitListProfilesResponse(w http.Res
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
 	w.Header().Set("Link", fmt.Sprint(response.Headers.Link))
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response.Body)
@@ -1032,7 +1040,11 @@ type CreateProfileResponseObject interface {
 }
 
 type CreateProfile201ResponseHeaders struct {
-	Location string
+	Location                string
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
 }
 
 type CreateProfile201JSONResponse struct {
@@ -1043,6 +1055,10 @@ type CreateProfile201JSONResponse struct {
 func (response CreateProfile201JSONResponse) VisitCreateProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(201)
 
 	return json.NewEncoder(w).Encode(response.Body)
@@ -1089,10 +1105,22 @@ type DeleteProfileResponseObject interface {
 	VisitDeleteProfileResponse(w http.ResponseWriter) error
 }
 
+type DeleteProfile204ResponseHeaders struct {
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
+}
+
 type DeleteProfile204Response struct {
+	Headers DeleteProfile204ResponseHeaders
 }
 
 func (response DeleteProfile204Response) VisitDeleteProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(204)
 	return nil
 }
@@ -1150,7 +1178,11 @@ type GetProfileByIdResponseObject interface {
 }
 
 type GetProfileById200ResponseHeaders struct {
-	ETag ETagValue
+	ETag                    ETagValue
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
 }
 
 type GetProfileById200JSONResponse struct {
@@ -1161,6 +1193,10 @@ type GetProfileById200JSONResponse struct {
 func (response GetProfileById200JSONResponse) VisitGetProfileByIdResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response.Body)
@@ -1208,13 +1244,29 @@ type ModifyProfileResponseObject interface {
 	VisitModifyProfileResponse(w http.ResponseWriter) error
 }
 
-type ModifyProfile200JSONResponse SuccessProfile
+type ModifyProfile200ResponseHeaders struct {
+	ETag                    ETagValue
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
+}
+
+type ModifyProfile200JSONResponse struct {
+	Body    SuccessProfile
+	Headers ModifyProfile200ResponseHeaders
+}
 
 func (response ModifyProfile200JSONResponse) VisitModifyProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(200)
 
-	return json.NewEncoder(w).Encode(response)
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type ModifyProfile400ApplicationProblemPlusJSONResponse struct {
@@ -1281,7 +1333,11 @@ type UpdateProfileResponseObject interface {
 }
 
 type UpdateProfile200ResponseHeaders struct {
-	ETag ETagValue
+	ETag                    ETagValue
+	XRateLimitLimit         int
+	XRateLimitRemaining     int
+	XRateLimitResetSeconds  int
+	XRateLimitWindowSeconds int
 }
 
 type UpdateProfile200JSONResponse struct {
@@ -1292,6 +1348,10 @@ type UpdateProfile200JSONResponse struct {
 func (response UpdateProfile200JSONResponse) VisitUpdateProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprint(response.Headers.XRateLimitLimit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprint(response.Headers.XRateLimitRemaining))
+	w.Header().Set("X-RateLimit-Reset-Seconds", fmt.Sprint(response.Headers.XRateLimitResetSeconds))
+	w.Header().Set("X-RateLimit-Window-Seconds", fmt.Sprint(response.Headers.XRateLimitWindowSeconds))
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response.Body)

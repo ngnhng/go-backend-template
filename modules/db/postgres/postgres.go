@@ -48,21 +48,6 @@ type (
 
 		// TODO: partitioning config
 	}
-
-	// Note: For env parsing to work, we must export all struct fields
-	PostgresConnectionConfig struct {
-		WriteConfig PoolConfig   `envPrefix:"POSTGRES_PRIMARY_"`
-		ReadConfigs []PoolConfig `envPrefix:"POSTGRES_REPLICA_"`
-	}
-
-	PoolConfig struct {
-		Host         string `env:"HOST"     envDefault:"localhost"`
-		Port         uint16 `env:"PORT"     envDefault:"5432"`
-		User         string `env:"USER"     envDefault:"postgres"`
-		Password     string `env:"PASSWORD" envDefault:"postgres"`
-		Database     string `env:"DATABASE" envDefault:"postgres"`
-		PoolMaxConns int    `env:"POOL_MAX_CONNS" envDefault:"5"`
-	}
 )
 
 // GenerateMigration implements db.ConnectionPool.
@@ -190,7 +175,7 @@ func connString(cfg *PoolConfig) string {
 
 func New(
 	ctx context.Context,
-	config *PostgresConnectionConfig,
+	config *PostgresConfig,
 	opts PostgresOptions,
 ) (*PostgresConnectionPool, error) {
 	writer, err := initDBFromConfig(ctx, &config.WriteConfig, opts.WriterOptions...)

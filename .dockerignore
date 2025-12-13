@@ -1,1 +1,31 @@
-compose.yaml
+# VCS
+.git
+.gitignore
+
+# Local env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Editor / IDE / tooling
+.vscode
+.idea
+.DS_Store
+
+# Go caches (repo-local)
+.gocache
+.gomodcache
+.gopath
+.cache
+
+# Build/test artifacts
+*.out
+*.test
+coverage.*
+**/*.prof
+tmp/
+bin/
+dist/
+build/
+

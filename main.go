@@ -22,19 +22,24 @@ import (
 	"context"
 	"embed"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"app/modules/appconfig"
+	"app/modules/clock"
 	"app/modules/db/postgres"
+	"app/modules/db/redis"
+	"app/modules/db/redis/counter"
 	hmac_sign "app/modules/hmac"
 	"app/modules/middleware"
+	"app/modules/middleware/ratelimit"
+	rl "app/modules/ratelimit"
 	"app/modules/server"
 	"app/modules/services"
 	"app/modules/telemetry"
-
-	"github.com/caarlos0/env/v11"
 
 	persistence "app/core/profile/adapters/persistence/pg"
 
@@ -61,17 +66,20 @@ func main() {
 	// manual dependency injections, imo there's no need to over-engineer with DI frameworks like Fx or Wire
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
+	clock := clock.RealClock{}
+
+	// --- application config ----
+	appConfig, err := appconfig.Load()
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load config", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	// --- infrastructure ---
 
-	postgresEnvar, err := env.ParseAs[postgres.PostgresConnectionConfig]()
-	if err != nil {
-		slog.ErrorContext(ctx, "config error", slog.Any("error", err))
-		exitCode = 1
-		return
-	}
 	connectionPool, err := postgres.New(
 		ctx,
-		&postgresEnvar,
+		&appConfig.Postgres,
 		postgres.PostgresOptions{
 			// assuming writer connection does not pass through pgBouncer,
 			// so we can apply server-side prepared statements
@@ -98,13 +106,7 @@ func main() {
 		return
 	}
 
-	hmacConfig, err := env.ParseAs[hmac_sign.HMACConfig]()
-	if err != nil {
-		slog.ErrorContext(ctx, "hmac key not configured", slog.Any("error", err))
-		exitCode = 1
-		return
-	}
-	signer, err := hmac_sign.NewHMACSigner([]byte(hmacConfig.Secret))
+	signer, err := hmac_sign.NewHMACSigner([]byte(appConfig.HMAC.Secret))
 	if err != nil {
 		slog.ErrorContext(ctx, "hmac signer setup error", slog.Any("error", err))
 		exitCode = 1
@@ -121,13 +123,7 @@ func main() {
 		return
 	}
 
-	telemetryConfig, err := env.ParseAs[telemetry.Config]()
-	if err != nil {
-		slog.ErrorContext(ctx, "telemetry not properly configured", slog.Any("error", err))
-		exitCode = 1
-		return
-	}
-	otelShutdown, err := telemetry.Init(ctx, telemetryConfig)
+	otelShutdown, err := telemetry.Init(ctx, appConfig.Otel)
 	if err != nil {
 		slog.ErrorContext(ctx, "telemetry not properly configured", slog.Any("error", err))
 		exitCode = 1
@@ -138,6 +134,47 @@ func main() {
 			slog.ErrorContext(ctx, "telemetry shutdown error", slog.Any("error", err))
 		}
 	}()
+
+	redisClient, err := redis.NewRueidisClient(ctx, appConfig.Redis)
+	if err != nil {
+		slog.ErrorContext(ctx, "redis not properly setup", slog.Any("error", err))
+		exitCode = 1
+		return
+	}
+
+	redisCounter := counter.NewInstrumentedRedisCounterStore(redisClient, "dev")
+
+	keyStrategies := map[ratelimit.KeyStrategyId]ratelimit.KeyFunc{
+		"remote_ip": ratelimit.RemoteIpKeyFunc,
+	}
+
+	slog.Debug("app rate limit config", slog.Any("rate_limit_config", appConfig.RateLimit))
+
+	rtp, err := ratelimit.ParsePolicy(
+		rl.SlidingWindowFactory(clock, redisCounter, "dev"),
+		&appConfig.RateLimit,
+		// TODO: provide same gin framework version example
+		func(r *http.Request) ratelimit.RouteInfo {
+			id := ratelimit.Pattern(r.Pattern)
+			// pattern is empty if request is not matched again a pattern
+			if r.Pattern == "" {
+				id = ratelimit.Pattern(r.URL.Path)
+			}
+			return ratelimit.RouteInfo{
+				ID:     id,
+				Method: r.Method,
+				Path:   r.URL.Path,
+			}
+		},
+		keyStrategies,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "ratelimit config not properly parsed", slog.Any("error", err))
+		exitCode = 1
+		return
+	}
+
+	rateLimitMiddleware := ratelimit.NewRateLimitMiddleware(rtp)
 
 	// --- application layer ---
 
@@ -154,7 +191,8 @@ func main() {
 	profileSvc := services.NewProfileAPIService(
 		profileApi,
 		validationSpecFS,
-		"oapi/profile-api-spec.yaml",
+		// TODO: fail fast when file not exists
+		"modules/oapi/openapi-profile.yaml",
 	)
 
 	server, err := server.New(
@@ -163,6 +201,7 @@ func main() {
 		server.WithServices(profileSvc),
 		server.WithGlobalMiddlewares(
 			middleware.Telemetry(httpMetrics),
+			rateLimitMiddleware,
 			profile_http.RecoverHTTPMiddleware(),
 		),
 	)

@@ -16,45 +16,130 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
+	"math/bits"
 	"time"
+
+	"app/modules/clock"
 )
 
-// slidingWindowType: Can be COUNT_BASED or TIME_BASED.
-// slidingWindowSize:
-// For COUNT_BASED: The number of the last calls to record and aggregate (e.g., the last 100 calls).
-// For TIME_BASED: The duration (e.g., in seconds) over which to record and aggregate calls (e.g., the last 60 seconds).
-// minimumNumberOfCalls: The minimum number of calls required in the window before the failure rate or slow call rate can be calculated and the circuit breaker allowed to transition states (e.g., from CLOSED to OPEN). This prevents the circuit from opening prematurely due to a small number of initial failures.
-// failureRateThreshold: The percentage of failed calls that will cause the circuit breaker to open.
-// waitDurationInOpenState: The amount of time the circuit breaker should remain in the OPEN state before transitioning to HALF_OPEN.
+var _ RateLimiter = (*SlidingWindowRateLimiter)(nil)
 
-// Timer is
+// Time-based 2-window sliding counter implementation of the rate limiter.
+// It uses a time-based sliding window implemented as two adjacent fixed windows (current + previous) and interpolates between them.
+type (
+	SlidingWindowRateLimiter struct {
+		clock     clock.Clock
+		counter   CounterStore
+		keyPrefix string
 
-// TODO: on distributed count / counter service?
-// CounterStore is the storage abstraction ratelimit uses.
-type CounterStore interface {
-	// Incr increments a counter at key and returns the new value.
-	// TTL tells the store how long to keep the key alive (at least).
-	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
+		limit  uint64
+		window time.Duration
+	}
+)
 
-	// Get returns the current value of a counter, or 0 if missing.
-	Get(ctx context.Context, key string) (int64, error)
+func SlidingWindowFactory(clock clock.Clock, counter CounterStore, keyPrefix string) LimiterFactory {
+	return func(l int64, w time.Duration) RateLimiter {
+		return &SlidingWindowRateLimiter{
+			clock,
+			counter,
+			keyPrefix,
+			uint64(l),
+			w,
+		}
+	}
 }
 
-// Result represents the outcome of a rate limit decision.
-type Result struct {
-	Allowed       bool
-	Remaining     int64         // how many requests left in current window
-	RetryAfter    time.Duration // if not allowed, when client may retry
-	Limit         int64         // max allowed in window
-	Window        time.Duration // configured window size
-	WindowResetIn time.Duration // time until current window ends
+// Allow implements RateLimiter.
+func (s *SlidingWindowRateLimiter) Allow(ctx context.Context, key Key) (Result, error) {
+	now := s.clock.Now()
+	nowNs := now.UnixNano()
+	windowNs := s.window.Nanoseconds()
+	// the current window we are in
+	currentWindowIdx := nowNs / windowNs
+	currentWindowCount, err := s.incrementWindow(ctx, key, currentWindowIdx)
+	if err != nil {
+		return Result{}, err
+	}
+
+	currentWindowStartNs := currentWindowIdx * windowNs
+
+	prevKey := s.buildKey(key, currentWindowIdx-1)
+
+	prevWindowCount, err := s.counter.Get(ctx, prevKey)
+	if err != nil {
+		return Result{}, err
+	}
+
+	currentWindowCount = max(currentWindowCount, 0)
+	prevWindowCount = max(prevWindowCount, 0)
+
+	currentWindowElapsedNs := nowNs - currentWindowStartNs
+	currentWindowElapsedNs = min(currentWindowElapsedNs, windowNs)
+	currentWindowElapsedNs = max(currentWindowElapsedNs, 0)
+	prevWindowWeightNs := windowNs - currentWindowElapsedNs
+
+	windowResetIn := max(s.window-time.Duration(currentWindowElapsedNs), 0)
+
+	windowNsU := uint64(windowNs)
+
+	// maintain accuracy by avoiding float64
+	// preventing cases like similar remaining for two consecutive requests
+	// we do:
+	// usage = current_count * window + prev_count * prev_weight)
+	// then compare usage to limit*window (same unit)
+	curHi, curLo := bits.Mul64(uint64(currentWindowCount), windowNsU)
+	prevHi, prevLo := bits.Mul64(uint64(prevWindowCount), uint64(prevWindowWeightNs))
+	usageLo, carry := bits.Add64(curLo, prevLo, 0)
+	usageHi, _ := bits.Add64(curHi, prevHi, carry)
+
+	limitHi, limitLo := bits.Mul64(s.limit, windowNsU)
+	allowed := usageHi < limitHi || (usageHi == limitHi && usageLo <= limitLo)
+
+	// Assume used request is max uint64 if we later cannot calculate the correct value
+	usedRequestsCeil := uint64(^uint64(0))
+
+	// try to find the usage_requests = ceil(usage / window)
+	if usageHi == 0 {
+		// plain integer division truncates (usage / window = floor(usage / window))
+		// so we add (divisor - 1 ) to round up when there is remainder
+		usedRequestsCeil = (usageLo + windowNsU - 1) / windowNsU
+	} else if usageHi < windowNsU {
+		q, r := bits.Div64(usageHi, usageLo, windowNsU)
+		usedRequestsCeil = q
+		// add one for remainder
+		// and also check against maxUint64 to prevent overflow
+		if r != 0 && usedRequestsCeil != ^uint64(0) {
+			usedRequestsCeil++
+		}
+	}
+
+	remainingU := uint64(0)
+	if usedRequestsCeil < s.limit {
+		remainingU = s.limit - usedRequestsCeil
+	}
+
+	result := Result{
+		Allowed:       allowed,
+		Remaining:     int64(remainingU),
+		RetryAfter:    windowResetIn,
+		Limit:         int64(s.limit),
+		Window:        s.window,
+		WindowResetIn: windowResetIn,
+	}
+
+	if result.Allowed {
+		result.RetryAfter = 0
+	}
+
+	return result, nil
 }
 
-// For application layer rate limiting, key can be userId, remoteIp, etc.
-// It is up to the package users to decide on the final string output format.
-type Key string
+func (s *SlidingWindowRateLimiter) buildKey(key Key, windowIdx int64) string {
+	return fmt.Sprintf("%s:%s:%d", s.keyPrefix, key, windowIdx)
+}
 
-// Limiter decides whether a request associated with `key` is allowed.
-type Limiter interface {
-	Allow(ctx context.Context, key string) (Result, error)
+func (s *SlidingWindowRateLimiter) incrementWindow(ctx context.Context, key Key, windowIdx int64) (int64, error) {
+	k := s.buildKey(key, windowIdx)
+	return s.counter.Incr(ctx, k, s.window*2)
 }

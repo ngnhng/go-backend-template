@@ -13,6 +13,7 @@ require (
 	github.com/oapi-codegen/nullable v1.1.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/redis/rueidis v1.0.69
+	github.com/redis/rueidis/rueidishook v1.0.69
 	github.com/redis/rueidis/rueidisotel v1.0.69
 	github.com/stephenafamo/bob v0.42.0
 	github.com/stephenafamo/scan v0.7.0
@@ -24,6 +25,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.38.0
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
+	golang.org/x/time v0.12.0
 )
 
 require (
