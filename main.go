@@ -142,6 +142,8 @@ func main() {
 		return
 	}
 
+	defer redisClient.Close()
+
 	redisCounter := counter.NewInstrumentedRedisCounterStore(redisClient, "dev")
 
 	keyStrategies := map[ratelimit.KeyStrategyId]ratelimit.KeyFunc{
